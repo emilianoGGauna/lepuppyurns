@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Platform</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .navbar {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .menu {
+            display: none;
+            flex-direction: column;
+            background-color: #444;
+            position: absolute;
+            right: 20px;
+            top: 50px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .menu a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 0;
+            text-align: center;
+        }
+        .menu a:hover {
+            background-color: #555;
+        }
+        .hamburger {
+            cursor: pointer;
+        }
+        .hamburger div {
+            width: 30px;
+            height: 4px;
+            background-color: white;
+            margin: 5px 0;
+        }
+        .container {
+            margin: 20px;
+            text-align: center;
+        }
+        .container h1 {
+            color: #333;
+        }
+    </style>
+    <script>
+        function toggleMenu() {
+            const menu = document.querySelector(".menu");
+            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        }
+    </script>
+</head>
+<body>
+    <div class="navbar">
+        <h1>Admin Platform</h1>
+        <div class="hamburger" onclick="toggleMenu()">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="menu">
+            <a href="/adminplatform">Plataforma</a>
+            <a href="/adminusuarios">Usuarios</a>
+            <a href="/admincatalogo">Catálogo</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>Bienvenido, Admin {{ admin_name }}</h1>
+    </div>
+</body>
+</html>

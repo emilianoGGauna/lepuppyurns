@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .navbar {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .menu {
+            display: none;
+            flex-direction: column;
+            background-color: #444;
+            position: absolute;
+            right: 20px;
+            top: 50px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .menu a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 0;
+            text-align: center;
+        }
+        .menu a:hover {
+            background-color: #555;
+        }
+        .hamburger {
+            cursor: pointer;
+        }
+        .hamburger div {
+            width: 30px;
+            height: 4px;
+            background-color: white;
+            margin: 5px 0;
+        }
+        form {
+            width: 80%;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        form input, form select, form button {
+            margin: 10px 0;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #333;
+            color: white;
+        }
+        td {
+            vertical-align: middle;
+        }
+        .delete-btn {
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+        .delete-btn:hover {
+            opacity: 0.7;
+        }
+        .delete-btn i {
+            color: #ff4d4d;
+            font-size: 20px;
+        }
+        @media (max-width: 768px) {
+            table {
+                font-size: 14px;
+            }
+            .delete-btn i {
+                font-size: 18px;
+            }
+        }
+    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        function toggleMenu() {
+            const menu = document.querySelector(".menu");
+            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        }
+    </script>
+</head>
+<body>
+    <div class="navbar">
+        <h1>Usuarios</h1>
+        <div class="hamburger" onclick="toggleMenu()">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="menu">
+            <a href="/adminplatform">Plataforma</a>
+            <a href="/adminusuarios">Usuarios</a>
+            <a href="/admincatalogo">Catálogo</a>
+        </div>
+    </div>
+
+    <!-- Add User Form -->
+    <form action="/adduser" method="POST">
+        <input type="text" name="client_name" placeholder="Nombre del cliente" required>
+        <input type="text" name="phone" placeholder="Teléfono" required>
+        <input type="email" name="email" placeholder="Correo Electrónico" required>
+        <select name="access" required>
+            <option value="" disabled selected>Tipo de Acceso</option>
+            <option value="admin">Admin</option>
+            <option value="cliente">Cliente</option>
+        </select>
+        <input type="password" name="password" placeholder="Contraseña" required>
+        <input type="password" name="confirm_password" placeholder="Confirmar Contraseña" required>
+        <button type="submit">Añadir Usuario</button>
+    </form>
+
+    <!-- User Table -->
+    <table>
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Nombre</th>
+                <th>Acceso</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usuario in usuarios %}
+            <tr>
+                <td>{{ usuario.email }}</td>
+                <td>{{ usuario.client_name }}</td>
+                <td>{{ usuario.access }}</td>
+                <td>
+                    <form action="/deleteuser" method="POST" style="margin: 0; padding: 0;">
+                        <input type="hidden" name="client_id" value="{{ usuario.client_id }}">
+                        <button type="submit" class="delete-btn">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
