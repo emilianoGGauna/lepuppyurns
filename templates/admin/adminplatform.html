@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catálogo</title>
+    <title>Admin Platform</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
         }
         .navbar {
             background-color: #333;
@@ -51,30 +50,12 @@
             background-color: white;
             margin: 5px 0;
         }
-        .catalog-container {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-            padding: 20px;
-            margin: 0 auto;
-            max-width: 800px;
-        }
-        .model-card {
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        .container {
+            margin: 20px;
             text-align: center;
-            cursor: pointer;
-            transition: transform 0.2s;
         }
-        .model-card:hover {
-            transform: scale(1.05);
-        }
-        .model-card img {
-            max-width: 100%;
-            border-bottom: 1px solid #ddd;
-            border-radius: 8px;
+        .container h1 {
+            color: #333;
         }
     </style>
     <script>
@@ -82,15 +63,11 @@
             const menu = document.querySelector(".menu");
             menu.style.display = menu.style.display === "flex" ? "none" : "flex";
         }
-
-        function redirectToForms(modelUuid) {
-            window.location.href = `/adminforms/${modelUuid}`;
-        }
     </script>
 </head>
 <body>
     <div class="navbar">
-        <h1>Catálogo</h1>
+        <h1>Admin Platform</h1>
         <div class="hamburger" onclick="toggleMenu()">
             <div></div>
             <div></div>
@@ -100,15 +77,11 @@
             <a href="/adminplatform">Plataforma</a>
             <a href="/adminusuarios">Usuarios</a>
             <a href="/admincatalogo">Catálogo</a>
+            <a href="/">Salir</a>
         </div>
     </div>
-
-    <div class="catalog-container">
-        {% for item in catalogos %}
-            <div class="model-card" onclick="redirectToForms('{{ item['model-uuid'] }}')">
-                <img src="{{ item['img']['modelos'] }}" alt="{{ item['Tipo de Modelo'] }}">
-            </div>
-        {% endfor %}
+    <div class="container">
+        <h1>Bienvenido, Admin {{ admin_name }}</h1>
     </div>
 </body>
 </html>

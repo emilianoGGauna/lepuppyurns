@@ -1,4 +1,6 @@
 from flask import Flask, request, render_template, redirect, url_for, flash
+from functools import wraps
+from flask import session, redirect, url_for, flash
 import os
 import logging
 from pymongo import MongoClient
@@ -20,7 +22,7 @@ if not MONGO_URI:
     raise ValueError("La variable MONGO_URI no está configurada en el archivo .env")
 
 # Configuración de Flask
-app = Flask(__name__, static_folder="static")
+app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = APP_KEY
 
 # Conexión a la base de datos MongoDB
@@ -37,55 +39,95 @@ except Exception as e:
 # Instanciar PasswordManager
 password_manager = PasswordManager()
 
+# Middleware para verificar roles
+def role_required(role):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if "user_role" not in session or session["user_role"] != role:
+                flash("Acceso denegado.")
+                return redirect(url_for("login"))
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form.get("email")
         password = request.form.get("password")
-        logger.info(f"Intento de inicio de sesión para el correo: {email}")
 
-        # Verificar que ambos campos están llenos
         if not email or not password:
             flash("Por favor, complete todos los campos.")
-            logger.warning("Campos incompletos en el formulario de inicio de sesión.")
             return redirect(url_for("login"))
 
-        # Encriptar la contraseña ingresada
         try:
             contraseña_encriptada_ingresada = password_manager.encrypt_password(password)
-        except Exception as e:
-            flash(f"Error al encriptar la contraseña.")
-            logger.error(f"Error al encriptar la contraseña: {e}")
-            return redirect(url_for("login"))
-
-        # Buscar usuario con el correo y la contraseña encriptada
-        try:
             usuario = usuarios_collection.find_one({
                 "email": email,
                 "contraseña": contraseña_encriptada_ingresada
             })
         except Exception as e:
-            flash(f"Error al conectar con la base de datos.")
-            logger.error(f"Error al buscar el usuario en la base de datos: {e}")
+            flash("Error al conectar con la base de datos.")
+            logger.error(f"Error: {e}")
             return redirect(url_for("login"))
 
-        # Verificar si se encontró el usuario y si tiene permisos de administrador
-        if usuario and usuario.get("access") == "admin":
-            admin_name = usuario.get("client_name", "Admin")
-            flash(f"¡Bienvenido, Admin {admin_name}!")
-            logger.info(f"Inicio de sesión exitoso para el administrador: {admin_name}")
-            return render_template("adminplatform.html", admin_name=admin_name)
+        if usuario:
+            session["user_role"] = usuario.get("access")
+            session["user_name"] = usuario.get("client_name", "Usuario")
+            if usuario["access"] == "admin":
+                return redirect(url_for("adminplatform"))
+            elif usuario["access"] == "cliente":
+                return redirect(url_for("clientecatalogo"))
         else:
-            flash("Usuario o contraseña incorrectos, o no tiene permisos de administrador.")
-            logger.warning(f"Intento fallido de inicio de sesión para el correo: {email}")
+            flash("Usuario o contraseña incorrectos.")
             return redirect(url_for("login"))
 
     return render_template("login.html")
+##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## CLient PLATFORM
+##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+@app.route("/clientecatalogo")
+def clientecatalogo():
+    try:
+        catalogos = list(catalogo_collection.find({}, {"_id": 0, "Tipo de Modelo": 1, "img": 1, "model-uuid": 1}))
+        logger.info(f"Catálogo cargado correctamente: {catalogos}")
+        return render_template("cliente/clientecatalogo.html", catalogos=catalogos)
+    except Exception as e:
+        flash(f"Error al cargar el catálogo.")
+        logger.error(f"Error al cargar el catálogo: {e}")
+        return redirect(url_for("login"))
+
+
+@app.route("/clienteforms/<model_uuid>")
+def clienteforms(model_uuid):
+    try:
+        logger.info(f"Buscando modelo con UUID: {model_uuid}")
+        model = catalogo_collection.find_one({"model-uuid": model_uuid}, {"_id": 0})
+        if model:
+            logger.info(f"Modelo encontrado: {model['Tipo de Modelo']}")
+            return render_template("cliente/clienteforms.html", model=model)
+        else:
+            flash("Modelo no encontrado.")
+            logger.warning(f"Modelo no encontrado para UUID: {model_uuid}")
+            return redirect(url_for("clientecatalogo"))
+    except Exception as e:
+        flash(f"Error al cargar el formulario.")
+        logger.error(f"Error al cargar el formulario: {e}")
+        return redirect(url_for("clientecatalogo"))
+
+##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ADMIN PLATFORM
+##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 @app.route("/adminplatform")
 def adminplatform():
     logger.info("Acceso a la plataforma de administración.")
-    return render_template("adminplatform.html")
+    return render_template("admin/adminplatform.html")
 
 @app.route("/adminusuarios")
 def adminusuarios():
@@ -95,7 +137,7 @@ def adminusuarios():
             usuarios_collection.find({}, {"_id": 0, "email": 1, "client_name": 1, "access": 1, "client_id": 1})
         )
         logger.info("Usuarios cargados correctamente.")
-        return render_template("adminusuarios.html", usuarios=usuarios)
+        return render_template("admin/adminusuarios.html", usuarios=usuarios)
     except Exception as e:
         flash("Error al cargar los usuarios.")
         logger.error(f"Error al cargar los usuarios: {e}")
@@ -180,7 +222,7 @@ def admincatalogo():
     try:
         catalogos = list(catalogo_collection.find({}, {"_id": 0, "Tipo de Modelo": 1, "img": 1, "model-uuid": 1}))
         logger.info("Catálogo cargado correctamente.")
-        return render_template("admincatalogo.html", catalogos=catalogos)
+        return render_template("admin/admincatalogo.html", catalogos=catalogos)
     except Exception as e:
         flash(f"Error al cargar el catálogo.")
         logger.error(f"Error al cargar el catálogo: {e}")
@@ -193,7 +235,7 @@ def adminforms(model_uuid):
         model = catalogo_collection.find_one({"model-uuid": model_uuid}, {"_id": 0})
         if model:
             logger.info(f"Modelo encontrado: {model['Tipo de Modelo']}")
-            return render_template("adminforms.html", model=model)
+            return render_template("admin/adminforms.html", model=model)
         else:
             flash("Modelo no encontrado.")
             logger.warning(f"Modelo no encontrado para UUID: {model_uuid}")

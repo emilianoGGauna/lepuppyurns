@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Forms</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .navbar {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .menu {
+            display: none;
+            flex-direction: column;
+            background-color: #444;
+            position: absolute;
+            right: 20px;
+            top: 50px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .menu a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 0;
+            text-align: center;
+        }
+        .menu a:hover {
+            background-color: #555;
+        }
+        .hamburger {
+            cursor: pointer;
+        }
+        .hamburger div {
+            width: 30px;
+            height: 4px;
+            background-color: white;
+            margin: 5px 0;
+        }
+        .content {
+            display: flex;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .image-container {
+            flex: 1;
+            padding-right: 20px;
+        }
+        .image-container img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+        .form-container {
+            flex: 1;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: bold;
+        }
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group p {
+            margin: 0;
+            font-weight: bold;
+        }
+    </style>
+    <script>
+        function toggleMenu() {
+            const menu = document.querySelector(".menu");
+            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        }
+
+        function updateColorOptions(selectedType) {
+            const colorOptions = {
+                {% if 'Tipo Urna' in model['Forms'] and 'Chapa' in model['Forms']['Tipo Urna'] %}
+                Chapa: {{ model['Forms']['Tipo Urna']['Chapa']['Colores'] | safe }},
+                {% else %}
+                Chapa: [],
+                {% endif %}
+                {% if 'Tipo Urna' in model['Forms'] and 'MDF' in model['Forms']['Tipo Urna'] %} 
+                MDF: {{ model['Forms']['Tipo Urna']['MDF']['Colores'] | safe }} 
+                {% else %}
+                MDF: []
+                {% endif %}
+            };
+
+            const colorSelect = document.getElementById('color');
+            colorSelect.innerHTML = '';
+
+            if (colorOptions[selectedType]) {
+                colorOptions[selectedType].forEach(color => {
+                    const option = document.createElement('option');
+                    option.value = color;
+                    option.textContent = color;
+                    colorSelect.appendChild(option);
+                });
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="navbar">
+        <h1>Catálogo</h1>
+        <div class="hamburger" onclick="toggleMenu()">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="menu">
+            <a href="/adminplatform">Plataforma</a>
+            <a href="/adminusuarios">Usuarios</a>
+            <a href="/admincatalogo">Catálogo</a>
+            <a href="/">Salir</a>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- Left Side: Image -->
+        <div class="image-container">
+            <img src="{{ url_for('static', filename=model['img']['description_models'].split('static/')[1]) }}" alt="{{ model['Tipo de Modelo'] }}">
+        </div>
+
+        <!-- Right Side: Form -->
+        <div class="form-container">
+            <h2>Formulario de {{ model['Tipo de Modelo'] }}</h2>
+            <form>
+                {% for key, value in model['Forms'].items() %}
+                    {% if key == "Tipo Urna" and value %}
+                        <!-- Selector para Tipo Urna -->
+                        <div class="form-group">
+                            <label for="tipo-urna"><strong>Tipo Urna</strong></label>
+                            <select id="tipo-urna" name="tipo-urna" onchange="updateColorOptions(this.value)">
+                                {% for urna_type in value.keys() %}
+                                    <option value="{{ urna_type }}">{{ urna_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <!-- Selector para Colores -->
+                        {% if 'Chapa' in value and 'Colores' in value['Chapa'] %}
+                            <div class="form-group">
+                                <label for="color"><strong>Color</strong></label>
+                                <select id="color" name="color">
+                                    {% for color in value['Chapa']['Colores'] %}
+                                        <option value="{{ color }}">{{ color }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        {% endif %}
+                    {% elif value is string %}
+                        <!-- Mostrar strings como texto -->
+                        <div class="form-group">
+                            <label><strong>{{ key }}</strong></label>
+                            <p>{{ value }}</p>
+                        </div>
+                    {% elif value is iterable and value is not string %}
+                        <!-- Mostrar listas como dropdown -->
+                        <div class="form-group">
+                            <label for="{{ key }}"><strong>{{ key }}</strong></label>
+                            <select id="{{ key }}" name="{{ key }}">
+                                {% for option in value %}
+                                    <option value="{{ option }}">{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </form>
+        </div>
+    </div>
+</body>
+</html>
