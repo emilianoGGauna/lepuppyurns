@@ -67,17 +67,16 @@
             background-color: #f4f4f4;
         }
         .btn-export {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #007bff;
+            padding: 5px 10px;
+            background-color: #28a745;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 3px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
         }
         .btn-export:hover {
-            background-color: #0056b3;
+            background-color: #218838;
         }
     </style>
     <script>
@@ -104,10 +103,6 @@
     </div>
     <div class="container">
         <h2>Pedidos</h2>
-        <!-- Form to export table data to Excel -->
-        <form method="POST" action="/export_pedidos">
-            <button type="submit" class="btn-export">Exportar a Excel</button>
-        </form>
         <!-- Table displaying orders -->
         <table>
             <thead>
@@ -115,8 +110,9 @@
                     <th>Orden ID</th>
                     <th>Cliente</th>
                     <th>Fecha</th>
-                    <th>Modelo</th>
-                    <th>Cantidad</th>
+                    <th>Cantidad Total</th>
+                    <th>Total de Pedidos</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
             <tbody>
@@ -125,12 +121,18 @@
                     <td>{{ pedido["Orden ID"] }}</td>
                     <td>{{ pedido["Cliente Nombre"] }}</td>
                     <td>{{ pedido["Fecha"] }}</td>
-                    <td>{{ pedido["Modelo"] }}</td>
-                    <td>{{ pedido["Cantidad"] }}</td>
+                    <td>{{ pedido["Cantidad Total"] }}</td>
+                    <td>{{ pedido["Total Pedidos"] }}</td>
+                    <td>
+                        <!-- Botón para descargar el Excel de la orden -->
+                        <form method="GET" action="/export_pedido/{{ pedido['Orden ID'] }}">
+                            <button type="submit" class="btn-export">Descargar Excel</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        </table>        
     </div>
 </body>
 </html>

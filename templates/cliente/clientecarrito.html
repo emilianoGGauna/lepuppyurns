@@ -102,7 +102,7 @@
                 {% for item in carrito %}
                     <div class="col-md-6 col-lg-4 mb-4">
                         <div class="card shadow-sm">
-                            <img src="{{ item.model['img']['modelos'] }}" alt="{{ item.model['Tipo de Modelo'] }}" class="card-img-top" style="max-height: 200px;">
+                            <img src="data:image/png;base64,{{ item.model['img']['modelos'] }}" alt="{{ item.model['Tipo de Modelo'] }}" class="card-img-top" style="max-height: 200px;">
                             <div class="card-body">
                                 <h5 class="card-title">{{ item.model['Tipo de Modelo'] }}</h5>
                                 <form method="POST" action="{{ url_for('update_cart') }}" class="mb-3">

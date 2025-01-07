@@ -1,4 +1,6 @@
 from flask import Flask, request, render_template, redirect, url_for, flash, request, jsonify, send_file
+from flask import Flask, render_template, request, send_file, flash, redirect, url_for
+from tempfile import NamedTemporaryFile
 from functools import wraps
 from flask import session, redirect, url_for, flash
 import os
@@ -10,6 +12,12 @@ import hashlib
 from datetime import datetime
 import urllib.parse
 import pandas as pd
+import random
+import string
+import base64
+from jinja2 import TemplateNotFound
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -324,6 +332,7 @@ def finalizar_compra():
             "cliente-id": client_id,
             "cliente-nombre": client_name,
             "time-stamp": time_stamp,
+            "Estado": "En proceso",
             "pedidos": pedidos
         }
 
@@ -363,41 +372,88 @@ def finalizar_compra():
 ## ADMIN PLATFORM
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-from flask import Flask, render_template, request, send_file, flash, redirect, url_for
-from tempfile import NamedTemporaryFile
-
-@app.route("/export_pedidos", methods=["POST"])
-def export_pedidos():
+@app.route("/export_pedido/<orden_id>", methods=["GET"])
+def export_pedido(orden_id):
     try:
         pedidos_collection = db["pedidos"]
-        pedidos = list(pedidos_collection.find({}))
-        pedidos_data = []
-        for pedido in pedidos:
-            for item in pedido["pedidos"]:
-                pedidos_data.append({
-                    "Orden ID": pedido.get("orden-id", "N/A"),
-                    "Cliente Nombre": pedido.get("cliente-nombre", "N/A"),
-                    "Fecha": pedido.get("time-stamp", "N/A"),
-                    "Modelo": item.get("modelo", "N/A"),
-                    "Cantidad": item.get("cantidad", "N/A"),
-                    **item.get("atributos", {})
-                })
+        pedido = pedidos_collection.find_one({"orden-id": orden_id})
+        
+        if not pedido:
+            flash("Pedido no encontrado.")
+            return redirect(url_for("adminplatform"))
+        
+        # Calcular la cantidad total y el número de modelos
+        total_cantidad = sum(item["cantidad"] for item in pedido["pedidos"])
+        total_modelos = len(pedido["pedidos"])
 
-        df_pedidos = pd.DataFrame(pedidos_data)
+        # Crear un nuevo archivo Excel con openpyxl
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Resumen del Pedido"
 
-        # Usar un archivo temporal para guardar el Excel
+        # Estilo para el encabezado
+        bold_font = Font(bold=True, size=14, color="FFFFFF")
+        header_fill = PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid")
+        center_alignment = Alignment(horizontal="center", vertical="center")
+
+        # Agregar encabezado general
+        ws.merge_cells("A1:F1")
+        ws["A1"] = "Resumen del Pedido"
+        ws["A1"].font = Font(bold=True, size=18)
+        ws["A1"].alignment = center_alignment
+        ws["A1"].fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")  # Fondo amarillo
+
+        # Información principal del pedido
+        ws.append(["Orden ID", pedido.get("orden-id", "-")])
+        ws.append(["Cliente Nombre", pedido.get("cliente-nombre", "-")])
+        ws.append(["Fecha", pedido.get("time-stamp", "-")])
+        ws.append(["Cantidad Total", total_cantidad])
+        ws.append(["Número de Modelos", total_modelos])
+        ws.append([])  # Fila vacía para separar encabezado del contenido
+
+        # Crear conjunto único de todos los atributos dinámicos en los modelos
+        all_attributes = set()
+        for item in pedido["pedidos"]:
+            all_attributes.update(item.get("atributos", {}).keys())
+
+        # Encabezados para la tabla
+        headers = ["Modelo", "Cantidad"] + sorted(all_attributes)  # Aseguramos orden alfabético para atributos
+        for col, header in enumerate(headers, start=1):
+            cell = ws.cell(row=7, column=col)
+            cell.value = header
+            cell.font = bold_font
+            cell.fill = header_fill
+            cell.alignment = center_alignment
+
+        # Agregar filas con datos de los modelos en el pedido
+        for item in pedido["pedidos"]:
+            row = [
+                item.get("modelo", "-"),
+                item.get("cantidad", 0),
+            ]
+            # Agregar valores de atributos dinámicos en el orden de los encabezados
+            for attr in sorted(all_attributes):
+                row.append(item.get("atributos", {}).get(attr, "-"))  # Si no existe el atributo, ponemos "N/A"
+            ws.append(row)  # Solo añadir datos, no encabezados
+
+        # Ajustar ancho de columnas
+        column_widths = [20, 10] + [15 for _ in all_attributes]  # Ajustar según el contenido esperado
+        for i, width in enumerate(column_widths, start=1):
+            ws.column_dimensions[chr(64 + i)].width = width
+
+        # Guardar el archivo temporalmente
         with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
-            df_pedidos.to_excel(temp_file.name, index=False)
+            wb.save(temp_file.name)
             temp_file_path = temp_file.name
 
         return send_file(
             temp_file_path,
             as_attachment=True,
-            download_name="pedidos_filtrados.xlsx"
+            download_name=f"pedido_{orden_id}.xlsx"
         )
     except Exception as e:
-        logger.error(f"Error al exportar pedidos: {e}")
-        flash("Ocurrió un error al exportar los pedidos.")
+        logger.error(f"Error al exportar pedido {orden_id}: {e}")
+        flash("Ocurrió un error al exportar el pedido.")
         return redirect(url_for("adminplatform"))
 
 @app.route("/test_pedidos", methods=["GET"])
@@ -406,43 +462,31 @@ def test_pedidos():
     pedidos = list(pedidos_collection.find({}))
     return jsonify(pedidos)  # Devuelve los datos en formato JSON para verificar
 
-
-@app.route("/adminplatform", methods=["GET", "POST"])
+@app.route("/adminplatform", methods=["GET"])
 def adminplatform():
     try:
-        # Access the "pedidos" collection in the database
+        # Acceder a la colección de pedidos
         pedidos_collection = db["pedidos"]
-        pedidos = list(pedidos_collection.find({}))  # Retrieve all orders
+        pedidos = list(pedidos_collection.find({}))  # Obtener todos los pedidos
 
-        # Transform orders into a DataFrame for easier processing
-        pedidos_data = []
+        # Preparar datos para mostrar una sola fila por Orden ID
+        pedidos_resumidos = []
         for pedido in pedidos:
-            for item in pedido["pedidos"]:
-                pedidos_data.append({
-                    "Orden ID": pedido.get("orden-id", "N/A"),
-                    "Cliente Nombre": pedido.get("cliente-nombre", "N/A"),
-                    "Fecha": pedido.get("time-stamp", "N/A"),
-                    "Modelo": item.get("modelo", "N/A"),
-                    "Cantidad": item.get("cantidad", "N/A"),
-                    **item.get("atributos", {})  # Include dynamic attributes as columns
-                })
+            total_cantidad = sum(item["cantidad"] for item in pedido["pedidos"])  # Sumar todas las cantidades
+            total_pedidos = len(pedido["pedidos"])  # Contar el total de pedidos en la orden
+            pedidos_resumidos.append({
+                "Orden ID": pedido.get("orden-id", "N/A"),
+                "Cliente Nombre": pedido.get("cliente-nombre", "N/A"),
+                "Fecha": pedido.get("time-stamp", "N/A"),
+                "Cantidad Total": total_cantidad,
+                "Total Pedidos": total_pedidos
+            })
 
-        # Create a pandas DataFrame
-        df_pedidos = pd.DataFrame(pedidos_data)
+        # Renderizar la tabla con pedidos resumidos
+        return render_template("admin/adminplatform.html", pedidos=pedidos_resumidos)
 
-        if request.method == "POST":
-            # Save DataFrame to Excel
-            excel_path = os.path.join(os.getcwd(), "pedidos_filtrados.xlsx")
-            df_pedidos.to_excel(excel_path, index=False)
-
-            # Send the file to the client as an attachment
-            return send_file(excel_path, as_attachment=True, download_name="pedidos_filtrados.xlsx")
-
-        # Render the orders in the HTML template
-        return render_template("admin/adminplatform.html", pedidos=df_pedidos.to_dict(orient="records"))
-    
     except Exception as e:
-        logger.error(f"Error in adminplatform: {e}")
+        logger.error(f"Error en adminplatform: {e}")
         flash("Ocurrió un error al cargar los pedidos.")
         return redirect(url_for("login"))
 
@@ -545,6 +589,85 @@ def admincatalogo():
         logger.error(f"Error al cargar el catálogo: {e}")
         return redirect(url_for("login"))
 
+# Generar cadena aleatoria de 20 caracteres
+def generate_random_string(length=20):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choices(characters, k=length))
+
+@app.route("/add_catalog_item", methods=["POST"])
+def add_catalog_item():
+    tipo_modelo = request.form["tipo_modelo"]
+    description_models_file = request.files["description_models"]
+    modelos_file = request.files["modelos"]
+
+    # Convertir imágenes a Base64
+    description_models_base64 = base64.b64encode(description_models_file.read()).decode("utf-8")
+    modelos_base64 = base64.b64encode(modelos_file.read()).decode("utf-8")
+
+    model_uuid = generate_random_string()
+
+    # Recopilar atributos únicos de Forms y corte_lazer
+    existing_items = list(catalogo_collection.find())
+    merged_forms = {}
+    merged_corte_lazer = {}
+
+    for item in existing_items:
+        # Combinar atributos de Forms
+        for key, value in item.get("Forms", {}).items():
+            if key not in merged_forms:
+                merged_forms[key] = value
+            else:
+                if isinstance(merged_forms[key], list):
+                    if isinstance(value, list):
+                        merged_forms[key] = list(set(merged_forms[key] + value))
+                    else:
+                        merged_forms[key] = list(set(merged_forms[key] + [value]))
+                elif isinstance(merged_forms[key], str):
+                    if isinstance(value, list):
+                        merged_forms[key] = list(set([merged_forms[key]] + value))
+                    else:
+                        merged_forms[key] = list(set([merged_forms[key], value]))
+
+        # Combinar atributos de corte_lazer
+        for key, value in item.get("corte_lazer", {}).items():
+            if key not in merged_corte_lazer:
+                merged_corte_lazer[key] = value
+            else:
+                if isinstance(merged_corte_lazer[key], list):
+                    if isinstance(value, list):
+                        merged_corte_lazer[key] = list(set(merged_corte_lazer[key] + value))
+                    else:
+                        merged_corte_lazer[key] = list(set(merged_corte_lazer[key] + [value]))
+                elif isinstance(merged_corte_lazer[key], str):
+                    if isinstance(value, list):
+                        merged_corte_lazer[key] = list(set([merged_corte_lazer[key]] + value))
+                    else:
+                        merged_corte_lazer[key] = list(set([merged_corte_lazer[key], value]))
+
+    # Insertar nuevo elemento en la base de datos
+    new_item = {
+        "model-uuid": model_uuid,
+        "Tipo de Modelo": tipo_modelo,
+        "Forms": merged_forms,
+        "corte_lazer": merged_corte_lazer,
+        "img": {
+            "description_models": description_models_base64,
+            "modelos": modelos_base64,
+        },
+        "sort_order": catalogo_collection.count_documents({})  # Asigna el orden al final por defecto
+    }
+    catalogo_collection.insert_one(new_item)
+    return redirect("/admincatalogo")
+
+@app.route("/delete_catalog_item/<model_uuid>", methods=["DELETE"])
+def delete_catalog_item(model_uuid):
+    result = catalogo_collection.delete_one({"model-uuid": model_uuid})
+    if result.deleted_count > 0:
+        return "Deleted successfully", 200
+    else:
+        return "Item not found", 404
+
+
 @app.route("/adminforms/<model_uuid>")
 def adminforms(model_uuid):
     try:
@@ -561,6 +684,79 @@ def adminforms(model_uuid):
         flash("Error al cargar el formulario.")
         logger.error(f"Error al cargar el formulario: {e}")
         return redirect(url_for("admincatalogo"))
+    
+@app.route("/get_forms/<model_uuid>", methods=["GET"])
+def get_forms(model_uuid):
+    try:
+        model = catalogo_collection.find_one({"model-uuid": model_uuid})
+        if not model:
+            return jsonify({"error": "Modelo no encontrado"}), 404
+
+        return jsonify(model.get("Forms", {})), 200
+    except Exception as e:
+        logger.error(f"Error al obtener el JSON para {model_uuid}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+
+@app.route("/edit_forms/<model_uuid>", methods=["POST"])
+def edit_forms(model_uuid):
+    try:
+        updated_forms = request.json
+        if not updated_forms:
+            return jsonify({"error": "No se recibieron datos"}), 400
+
+        result = catalogo_collection.update_one(
+            {"model-uuid": model_uuid},
+            {"$set": {"Forms": updated_forms}}
+        )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Modelo no encontrado"}), 404
+
+        return jsonify({"message": "Formulario actualizado con éxito"}), 200
+    except Exception as e:
+        logger.error(f"Error al guardar el JSON para {model_uuid}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route("/get_corte_lazer/<model_uuid>", methods=["GET"])
+def get_corte_lazer(model_uuid):
+    """
+    Endpoint para obtener el contenido de `corte_lazer` de un modelo específico.
+    """
+    try:
+        model = catalogo_collection.find_one({"model-uuid": model_uuid}, {"_id": 0, "corte_lazer": 1})
+        if not model:
+            return jsonify({"error": "Modelo no encontrado"}), 404
+
+        corte_lazer = model.get("corte_lazer", {})
+        return jsonify(corte_lazer), 200
+    except Exception as e:
+        logger.error(f"Error al obtener corte_lazer para {model_uuid}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+    
+@app.route("/edit_corte_lazer/<model_uuid>", methods=["POST"])
+def edit_corte_lazer(model_uuid):
+    """
+    Endpoint para actualizar el contenido de `corte_lazer` de un modelo específico.
+    """
+    try:
+        updated_corte_lazer = request.json  # Obtener el JSON enviado en el cuerpo de la solicitud
+        if not updated_corte_lazer:
+            return jsonify({"error": "No se recibieron datos"}), 400
+
+        # Actualizar el campo `corte_lazer` en la base de datos
+        result = catalogo_collection.update_one(
+            {"model-uuid": model_uuid},
+            {"$set": {"corte_lazer": updated_corte_lazer}}
+        )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Modelo no encontrado"}), 404
+
+        return jsonify({"message": "Corte Láser actualizado con éxito"}), 200
+    except Exception as e:
+        logger.error(f"Error al guardar corte_lazer para {model_uuid}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>admin Catálogo</title>
+    <title>Admin Catálogo</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -76,20 +77,75 @@
             border-bottom: 1px solid #ddd;
             border-radius: 8px;
         }
+        .delete-button {
+            background-color: red;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .delete-button:hover {
+            background-color: darkred;
+        }
+        .view-button {
+            background-color: #333;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .view-button:hover {
+            background-color: #555;
+        }
+        .add-catalog-container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .add-catalog-container h2 {
+            text-align: center;
+        }
+        .add-catalog-container label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: bold;
+        }
+        .add-catalog-container input,
+        .add-catalog-container textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .add-catalog-container button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-catalog-container button:hover {
+            background-color: #555;
+        }
     </style>
-    <script>
-        function toggleMenu() {
-            const menu = document.querySelector(".menu");
-            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
-        }
-        function redirectToForms(modelUuid) {
-            window.location.href = `/adminforms/${modelUuid}`;
-        }
-    </script>
 </head>
 <body>
     <div class="navbar">
-        <h1>Catálogo</h1>
+        <h1>Admin Catálogo</h1>
         <div class="hamburger" onclick="toggleMenu()">
             <div></div>
             <div></div>
@@ -105,10 +161,66 @@
 
     <div class="catalog-container">
         {% for item in catalogos %}
-            <div class="model-card" onclick="redirectToForms('{{ item['model-uuid'] }}')">
-                <img src="{{ item['img']['modelos'] }}" alt="{{ item['Tipo de Modelo'] }}">
+            <div class="model-card">
+                <img src="data:image/png;base64,{{ item['img']['modelos'] }}" alt="{{ item['Tipo de Modelo'] }}">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
+                    <button class="delete-button" onclick="deleteCatalogItem('{{ item['model-uuid'] }}')">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                    <button class="view-button" onclick="redirectToForms('{{ item['model-uuid'] }}')">
+                        Ver Detalles
+                    </button>
+                </div>
             </div>
         {% endfor %}
     </div>
+    
+    <div class="add-catalog-container">
+        <h2>Agregar Nuevo Modelo</h2>
+        <form action="/add_catalog_item" method="POST" enctype="multipart/form-data">
+            <label for="tipo_modelo">Tipo de Modelo:</label>
+            <input type="text" id="tipo_modelo" name="tipo_modelo" required>
+
+            <label for="modelos">Imagen 1 (Modelos):</label>
+            <input type="file" id="modelos" name="modelos" accept="image/*" required>
+    
+            <label for="description_models">Imagen 2 (Formulario Models):</label>
+            <input type="file" id="description_models" name="description_models" accept="image/*" required>
+    
+            <button type="submit">Agregar Modelo</button>
+        </form>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            const menu = document.querySelector(".menu");
+            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        }
+
+        function redirectToForms(modelUuid) {
+            console.log("Redirecting to:", `/adminforms/${modelUuid}`);
+            window.location.href = `/adminforms/${modelUuid}`;
+        }
+
+        function deleteCatalogItem(modelUuid) {
+            if (confirm("¿Estás seguro de que deseas eliminar este modelo?")) {
+                fetch(`/delete_catalog_item/${modelUuid}`, {
+                    method: "DELETE",
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert("Modelo eliminado con éxito.");
+                        window.location.reload();
+                    } else {
+                        alert("Error al eliminar el modelo.");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error al eliminar el modelo:", error);
+                    alert("Ocurrió un error al intentar eliminar el modelo.");
+                });
+            }
+        }
+    </script>
 </body>
 </html>

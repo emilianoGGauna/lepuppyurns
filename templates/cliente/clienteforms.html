@@ -192,62 +192,61 @@
 
     <div class="content">
         <div class="image-container">
-            <img src="{{ url_for('static', filename=model['img']['description_models'].split('static/')[1]) }}" alt="{{ model['Tipo de Modelo'] }}">
+            <img src="data:image/png;base64,{{ model['img']['description_models'] }}" alt="{{ model['Tipo de Modelo'] }}">
         </div>
-
+    
         <div class="form-container">
             <h2>Formulario de {{ model['Tipo de Modelo'] }}</h2>
-            <form method="POST" action="{{ url_for('add_to_cart', model_uuid=model['model-uuid']) }}" onsubmit="validateForm(event)">
-                <div id="error-message" class="message">Por favor, asegúrese de que todos los campos obligatorios estén seleccionados.</div>
-                    {% for key, value in model['Forms'].items() %}
-                        {% if key == "Tipo Urna" and value %}
-                            <!-- Renderizar Tipo Urna y sus colores -->
+            <form method="POST" action="{{ url_for('add_to_cart', model_uuid=model['model-uuid']) }}">
+                {% for key, value in model['Forms'].items() %}
+                    {% if key == "Tipo Urna" and value %}
+                        <!-- Tipo Urna -->
+                        <div class="form-group">
+                            <label for="tipo-urna"><strong>Tipo Urna</strong></label>
+                            <select id="tipo-urna" name="tipo-urna" required onchange="updateColorOptions(this.value)">
+                                <option value="">Seleccione una opción</option>
+                                {% for material_type in value.keys() %}
+                                    <option value="{{ material_type }}">{{ material_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+    
+                        <!-- Colores -->
+                        <div class="form-group">
+                            <label for="color"><strong>Colores</strong></label>
+                            <select id="color" name="color" required>
+                                <option value="">Seleccione un tipo de urna primero</option>
+                            </select>
+                        </div>
+                    {% elif key != "Tipo Urna" %}
+                        <!-- Render otros campos -->
+                        {% if value is string %}
                             <div class="form-group">
-                                <label for="tipo-urna"><strong>Tipo Urna</strong></label>
-                                <select id="tipo-urna" name="tipo-urna" required onchange="updateColorOptions(this.value)">
-                                    <option value="">Seleccione un tipo de urna</option>
-                                    {% for material_type in model['Forms']['Tipo Urna'].keys() %}
-                                        <option value="{{ material_type }}">{{ material_type }}</option>
+                                <label><strong>{{ key }}</strong></label>
+                                <p>{{ value }}</p>
+                            </div>
+                        {% elif value is iterable and value is not string %}
+                            <div class="form-group">
+                                <label for="{{ key }}"><strong>{{ key }}</strong></label>
+                                <select id="{{ key }}" name="{{ key }}" required>
+                                    <option value="">Seleccione una opción</option>
+                                    {% for option in value %}
+                                        <option value="{{ option }}">{{ option }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                    
-                            <div class="form-group">
-                                <label for="color"><strong>Color</strong></label>
-                                <select id="color" name="color" required>
-                                    <option value="">Seleccione un tipo de urna primero</option>
-                                </select>
-                            </div>
-                        {% else %}
-                            <!-- Renderizar otros campos -->
-                            {% if value is string %}
-                                <div class="form-group">
-                                    <label><strong>{{ key }}</strong></label>
-                                    <p>{{ value }}</p>
-                                </div>
-                            {% elif value is iterable and value is not string %}
-                                <div class="form-group">
-                                    <label for="{{ key }}"><strong>{{ key }}</strong></label>
-                                    <select id="{{ key }}" name="{{ key }}" required>
-                                        <option value="">Seleccione una opción</option>
-                                        {% for option in value %}
-                                            <option value="{{ option }}">{{ option }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            {% endif %}
                         {% endif %}
-                    {% endfor %}
-
+                    {% endif %}
+                {% endfor %}
                 <div class="form-group">
                     <label for="cantidad"><strong>Cantidad</strong></label>
                     <input type="number" id="cantidad" name="cantidad" min="1" value="1" required>
                 </div>
-                    
                 <button type="submit">Añadir al carrito</button>
             </form>
         </div>
     </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

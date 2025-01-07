@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Forms</title>
+    <link href="https://cdn.jsdelivr.net/npm/jsoneditor/dist/jsoneditor.min.css" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,6 +24,18 @@
             margin: 0;
             font-size: 24px;
         }
+        .hamburger {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .hamburger div {
+            width: 30px;
+            height: 4px;
+            background-color: white;
+            margin: 3px 0;
+        }
         .menu {
             display: none;
             flex-direction: column;
@@ -37,19 +50,9 @@
             color: white;
             text-decoration: none;
             padding: 10px 0;
-            text-align: center;
         }
         .menu a:hover {
             background-color: #555;
-        }
-        .hamburger {
-            cursor: pointer;
-        }
-        .hamburger div {
-            width: 30px;
-            height: 4px;
-            background-color: white;
-            margin: 5px 0;
         }
         .content {
             display: flex;
@@ -80,27 +83,62 @@
             color: #333;
             font-weight: bold;
         }
-        .form-group select {
+        .form-group select, .form-group input {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
         }
-        .form-group p {
-            margin: 0;
+        button {
+            background-color: #333;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px; /* Añade un margen inferior entre los botones */
+        }
+
+        button:hover {
+            background-color: #555;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            padding-top: 100px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
             font-weight: bold;
         }
-    </style>
-    <script>
-        function toggleMenu() {
-            const menu = document.querySelector(".menu");
-            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
         }
-    </script>
+    </style>
 </head>
 <body>
     <div class="navbar">
-        <h1>Catálogo</h1>
+        <h1>Admin Forms</h1>
         <div class="hamburger" onclick="toggleMenu()">
             <div></div>
             <div></div>
@@ -115,57 +153,163 @@
     </div>
 
     <div class="content">
-        <!-- Left Side: Image -->
         <div class="image-container">
-            <img src="{{ url_for('static', filename=model['img']['description_models'].split('static/')[1]) }}" alt="{{ model['Tipo de Modelo'] }}">
+            <img src="data:image/png;base64,{{ model['img']['description_models'] }}" alt="{{ model['Tipo de Modelo'] }}">
         </div>
 
-        <!-- Right Side: Form -->
         <div class="form-container">
             <h2>Formulario de {{ model['Tipo de Modelo'] }}</h2>
-            <form>
+            <form method="POST" action="{{ url_for('add_to_cart', model_uuid=model['model-uuid']) }}">
                 {% for key, value in model['Forms'].items() %}
                     {% if key == "Tipo Urna" and value %}
-                        <!-- Selector para Tipo Urna -->
                         <div class="form-group">
                             <label for="tipo-urna"><strong>Tipo Urna</strong></label>
-                            <select id="tipo-urna" name="tipo-urna" onchange="updateColorOptions(this.value)">
-                                {% for urna_type in value.keys() %}
-                                    <option value="{{ urna_type }}">{{ urna_type }}</option>
+                            <select id="tipo-urna" name="tipo-urna" required onchange="updateColorOptions(this.value)">
+                                <option value="">Seleccione una opción</option>
+                                {% for material_type in model['Forms']['Tipo Urna'].keys() %}
+                                    <option value="{{ material_type }}">{{ material_type }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <!-- Selector para Colores -->
-                        {% if 'Chapa' in value and 'Colores' in value['Chapa'] %}
-                            <div class="form-group">
-                                <label for="color"><strong>Color</strong></label>
-                                <select id="color" name="color">
-                                    {% for color in value['Chapa']['Colores'] %}
-                                        <option value="{{ color }}">{{ color }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        {% endif %}
-                    {% elif value is string %}
-                        <!-- Mostrar strings como texto -->
                         <div class="form-group">
-                            <label><strong>{{ key }}</strong></label>
-                            <p>{{ value }}</p>
+                            <label for="color"><strong>Colores</strong></label>
+                            <select id="color" name="color" required>
+                                <option value="">Seleccione un tipo de urna primero</option>
+                            </select>
                         </div>
-                    {% elif value is iterable and value is not string %}
-                        <!-- Mostrar listas como dropdown -->
+                    {% else %}
                         <div class="form-group">
                             <label for="{{ key }}"><strong>{{ key }}</strong></label>
-                            <select id="{{ key }}" name="{{ key }}">
-                                {% for option in value %}
-                                    <option value="{{ option }}">{{ option }}</option>
-                                {% endfor %}
-                            </select>
+                            {% if value is iterable and value is not string %}
+                                <select id="{{ key }}" name="{{ key }}" required>
+                                    <option value="">Seleccione una opción</option>
+                                    {% for option in value %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                <p>{{ value }}</p>
+                            {% endif %}
                         </div>
                     {% endif %}
                 {% endfor %}
+
+                <button type="button" onclick="openEditor('{{ model['model-uuid'] }}')">Editar Formulario</button>
+                <button type="button" onclick="openCorteLazerEditor('{{ model['model-uuid'] }}')">Editar Corte Láser</button>
             </form>
         </div>
     </div>
+
+    <!-- Modal para editar JSON -->
+    <div id="jsonEditorModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditor()">&times;</span>
+            <h2>Editar Formulario</h2>
+            <div id="jsoneditor"></div>
+            <button onclick="saveEditor('{{ model['model-uuid'] }}')">Guardar Cambios</button>
+        </div>
+    </div>
+
+    <!-- Modal para editar corte láser -->
+    <div id="corteLazerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeCorteLazerEditor()">&times;</span>
+            <h2>Editar Corte Láser</h2>
+            <div id="corteLazerEditor"></div>
+            <button onclick="saveCorteLazer('{{ model['model-uuid'] }}')">Guardar Cambios</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsoneditor/dist/jsoneditor.min.js"></script>
+    <script>
+        let editor;
+        let corteLazerEditor;
+        const tipoUrnaData = {{ model['Forms'].get('Tipo Urna', {}) | tojson }};
+
+        function toggleMenu() {
+            const menu = document.querySelector('.menu');
+            menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function updateColorOptions(selectedMaterial) {
+            const colorSelect = document.getElementById("color");
+            colorSelect.innerHTML = "";
+            if (tipoUrnaData[selectedMaterial]?.Colores) {
+                tipoUrnaData[selectedMaterial].Colores.forEach(color => {
+                    const option = document.createElement("option");
+                    option.value = color;
+                    option.textContent = color;
+                    colorSelect.appendChild(option);
+                });
+            } else {
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "No hay colores disponibles";
+                colorSelect.appendChild(option);
+            }
+        }
+
+        function openEditor(model_uuid) {
+            document.getElementById('jsonEditorModal').style.display = 'block';
+            fetch(`/get_forms/${model_uuid}`)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('jsoneditor');
+                    if (!editor) {
+                        editor = new JSONEditor(container, { mode: 'tree', modes: ['tree', 'view', 'code'] });
+                    }
+                    editor.set(data);
+                });
+        }
+
+        function closeEditor() {
+            document.getElementById('jsonEditorModal').style.display = 'none';
+        }
+
+        function saveEditor(model_uuid) {
+            const updatedData = editor.get();
+            fetch(`/edit_forms/${model_uuid}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedData)
+            }).then(response => {
+                if (response.ok) {
+                    alert('Formulario actualizado con éxito');
+                    location.reload();
+                }
+            });
+        }
+
+        function openCorteLazerEditor(model_uuid) {
+            document.getElementById('corteLazerModal').style.display = 'block';
+            fetch(`/get_corte_lazer/${model_uuid}`)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('corteLazerEditor');
+                    if (!corteLazerEditor) {
+                        corteLazerEditor = new JSONEditor(container, { mode: 'tree', modes: ['tree', 'view', 'code'] });
+                    }
+                    corteLazerEditor.set(data);
+                });
+        }
+
+        function closeCorteLazerEditor() {
+            document.getElementById('corteLazerModal').style.display = 'none';
+        }
+
+        function saveCorteLazer(model_uuid) {
+            const updatedData = corteLazerEditor.get();
+            fetch(`/edit_corte_lazer/${model_uuid}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedData)
+            }).then(response => {
+                if (response.ok) {
+                    alert('Corte Láser actualizado con éxito');
+                    location.reload();
+                }
+            });
+        }
+    </script>
 </body>
 </html>
