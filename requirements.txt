@@ -2,3 +2,8 @@ Flask
 gunicorn
 python-dotenv
 pymongo
+logging
+hashlib
+datetime
+urllib3
+
