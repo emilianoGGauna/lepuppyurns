@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, flash, request, jsonify
+from flask import Flask, request, render_template, redirect, url_for, flash, request, jsonify, send_file
 from functools import wraps
 from flask import session, redirect, url_for, flash
 import os
@@ -9,6 +9,7 @@ from PasswordManager import PasswordManager
 import hashlib
 from datetime import datetime
 import urllib.parse
+import pandas as pd
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -362,10 +363,88 @@ def finalizar_compra():
 ## ADMIN PLATFORM
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-@app.route("/adminplatform")
+from flask import Flask, render_template, request, send_file, flash, redirect, url_for
+from tempfile import NamedTemporaryFile
+
+@app.route("/export_pedidos", methods=["POST"])
+def export_pedidos():
+    try:
+        pedidos_collection = db["pedidos"]
+        pedidos = list(pedidos_collection.find({}))
+        pedidos_data = []
+        for pedido in pedidos:
+            for item in pedido["pedidos"]:
+                pedidos_data.append({
+                    "Orden ID": pedido.get("orden-id", "N/A"),
+                    "Cliente Nombre": pedido.get("cliente-nombre", "N/A"),
+                    "Fecha": pedido.get("time-stamp", "N/A"),
+                    "Modelo": item.get("modelo", "N/A"),
+                    "Cantidad": item.get("cantidad", "N/A"),
+                    **item.get("atributos", {})
+                })
+
+        df_pedidos = pd.DataFrame(pedidos_data)
+
+        # Usar un archivo temporal para guardar el Excel
+        with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
+            df_pedidos.to_excel(temp_file.name, index=False)
+            temp_file_path = temp_file.name
+
+        return send_file(
+            temp_file_path,
+            as_attachment=True,
+            download_name="pedidos_filtrados.xlsx"
+        )
+    except Exception as e:
+        logger.error(f"Error al exportar pedidos: {e}")
+        flash("Ocurrió un error al exportar los pedidos.")
+        return redirect(url_for("adminplatform"))
+
+@app.route("/test_pedidos", methods=["GET"])
+def test_pedidos():
+    pedidos_collection = db["pedidos"]
+    pedidos = list(pedidos_collection.find({}))
+    return jsonify(pedidos)  # Devuelve los datos en formato JSON para verificar
+
+
+@app.route("/adminplatform", methods=["GET", "POST"])
 def adminplatform():
-    logger.info("Acceso a la plataforma de administración.")
-    return render_template("admin/adminplatform.html")
+    try:
+        # Access the "pedidos" collection in the database
+        pedidos_collection = db["pedidos"]
+        pedidos = list(pedidos_collection.find({}))  # Retrieve all orders
+
+        # Transform orders into a DataFrame for easier processing
+        pedidos_data = []
+        for pedido in pedidos:
+            for item in pedido["pedidos"]:
+                pedidos_data.append({
+                    "Orden ID": pedido.get("orden-id", "N/A"),
+                    "Cliente Nombre": pedido.get("cliente-nombre", "N/A"),
+                    "Fecha": pedido.get("time-stamp", "N/A"),
+                    "Modelo": item.get("modelo", "N/A"),
+                    "Cantidad": item.get("cantidad", "N/A"),
+                    **item.get("atributos", {})  # Include dynamic attributes as columns
+                })
+
+        # Create a pandas DataFrame
+        df_pedidos = pd.DataFrame(pedidos_data)
+
+        if request.method == "POST":
+            # Save DataFrame to Excel
+            excel_path = os.path.join(os.getcwd(), "pedidos_filtrados.xlsx")
+            df_pedidos.to_excel(excel_path, index=False)
+
+            # Send the file to the client as an attachment
+            return send_file(excel_path, as_attachment=True, download_name="pedidos_filtrados.xlsx")
+
+        # Render the orders in the HTML template
+        return render_template("admin/adminplatform.html", pedidos=df_pedidos.to_dict(orient="records"))
+    
+    except Exception as e:
+        logger.error(f"Error in adminplatform: {e}")
+        flash("Ocurrió un error al cargar los pedidos.")
+        return redirect(url_for("login"))
 
 @app.route("/adminusuarios")
 def adminusuarios():

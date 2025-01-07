@@ -52,10 +52,32 @@
         }
         .container {
             margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 8px;
             text-align: center;
         }
-        .container h1 {
-            color: #333;
+        table th {
+            background-color: #f4f4f4;
+        }
+        .btn-export {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn-export:hover {
+            background-color: #0056b3;
         }
     </style>
     <script>
@@ -81,7 +103,34 @@
         </div>
     </div>
     <div class="container">
-        <h1>Bienvenido, Admin {{ admin_name }}</h1>
+        <h2>Pedidos</h2>
+        <!-- Form to export table data to Excel -->
+        <form method="POST" action="/export_pedidos">
+            <button type="submit" class="btn-export">Exportar a Excel</button>
+        </form>
+        <!-- Table displaying orders -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Orden ID</th>
+                    <th>Cliente</th>
+                    <th>Fecha</th>
+                    <th>Modelo</th>
+                    <th>Cantidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pedido in pedidos %}
+                <tr>
+                    <td>{{ pedido["Orden ID"] }}</td>
+                    <td>{{ pedido["Cliente Nombre"] }}</td>
+                    <td>{{ pedido["Fecha"] }}</td>
+                    <td>{{ pedido["Modelo"] }}</td>
+                    <td>{{ pedido["Cantidad"] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </body>
 </html>

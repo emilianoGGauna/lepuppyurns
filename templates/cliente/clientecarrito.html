@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carrito de Compras</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,30 +24,73 @@
         .navbar h1 {
             margin: 0;
             font-size: 24px;
+            flex: 1;
+            text-align: left;
             color: white;
         }
-        .menu {
+        .cart-icon {
+            flex: 1;
             display: flex;
-            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+        .hamburger {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            flex: 1;
+        }
+        .hamburger div {
+            width: 30px;
+            height: 4px;
+            background-color: white;
+            margin: 3px 0;
+        }
+        .menu {
+            display: none;
+            flex-direction: column;
+            background-color: #444;
+            position: absolute;
+            right: 20px;
+            top: 50px;
+            padding: 10px;
+            border-radius: 5px;
         }
         .menu a {
             color: white;
             text-decoration: none;
-            font-size: 16px;
+            padding: 10px 0;
+            text-align: center;
         }
         .menu a:hover {
-            text-decoration: underline;
-        }
-        .card img {
-            object-fit: cover;
+            background-color: #555;
         }
     </style>
+    <script>
+        function toggleMenu() {
+            const menu = document.querySelector(".menu");
+            menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+        }
+    </script>
 </head>
 <body>
     <div class="navbar">
-        <h1>Mi Carrito</h1>
+        <h1>Carrito</h1>
+        <div class="cart-icon">
+            <a href="/clientecarrito" class="btn btn-outline-light">
+                <i class="bi bi-cart"></i> Carrito
+            </a>
+        </div>
+        <div class="hamburger" onclick="toggleMenu()">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
         <div class="menu">
             <a href="/clientecatalogo">Catálogo</a>
+            <a href="/clientecarrito">Carrito</a>
             <a href="/">Salir</a>
         </div>
     </div>
