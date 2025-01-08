@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .navbar {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .menu {
+            display: none;
+            flex-direction: column;
+            background-color: #444;
+            position: absolute;
+            right: 20px;
+            top: 50px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .menu a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 0;
+            text-align: center;
+        }
+        .menu a:hover {
+            background-color: #555;
+        }
+        .hamburger {
+            cursor: pointer;
+        }
+        .hamburger div {
+            width: 30px;
+            height: 4px;
+            background-color: white;
+            margin: 5px 0;
+        }
+        .container {
+            padding: 20px;
+            margin: 0 auto;
+            max-width: 900px;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .graph-container {
+            margin-bottom: 40px;
+        }
+        .plotly-graph {
+            margin: 0 auto;
+            width: 100%;
+            max-width: 700px;
+            height: 400px;
+            border: 1px solid #ddd;
+            background-color: white;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>Admin Dashboard</h1>
+        <div class="hamburger" onclick="toggleMenu()">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="menu">
+            <a href="/adminplatform">Plataforma</a>
+            <a href="/adminusuarios">Usuarios</a>
+            <a href="/admincatalogo">Catálogo</a>
+            <a href="/admindashboard">Dashboard</a>
+            <a href="/">Salir</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Dashboard de Pedidos</h2>
+        
+        <!-- Gráfico de pedidos por día -->
+        <div class="graph-container">
+            <h3>Pedidos por Día (Último Mes)</h3>
+            <div id="pedidos-por-dia" class="plotly-graph"></div>
+        </div>
+        
+        <!-- Gráfico de top clientes frecuentes -->
+        <div class="graph-container">
+            <h3>Top 3 Clientes Frecuentes</h3>
+            <div id="top-clientes" class="plotly-graph"></div>
+        </div>
+    
+        <!-- Gráfico de top modelos más pedidos -->
+        <div class="graph-container">
+            <h3>Top 3 Modelos Más Pedidos</h3>
+            <div id="top-modelos" class="plotly-graph"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Gráfico de pedidos por día
+        const pedidosPorDia = {{ graph_pedidos_por_dia|safe }};
+        Plotly.newPlot('pedidos-por-dia', pedidosPorDia.data, pedidosPorDia.layout);
+    
+        // Gráfico de top clientes frecuentes
+        const topClientes = {{ graph_top_clientes|safe }};
+        Plotly.newPlot('top-clientes', topClientes.data, topClientes.layout);
+    
+        // Gráfico de top modelos más pedidos
+        const topModelos = {{ graph_top_modelos|safe }};
+        Plotly.newPlot('top-modelos', topModelos.data, topModelos.layout);
+    
+        // Función para mostrar/ocultar el menú
+        function toggleMenu() {
+            const menu = document.querySelector('.menu');
+            menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+        }
+    </script>
+    
+</body>
+</html>

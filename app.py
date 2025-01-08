@@ -18,8 +18,16 @@ import base64
 from jinja2 import TemplateNotFound
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Font, Alignment, PatternFill
+from bson import ObjectId  # Importar para manejar ObjectId en MongoDB
+from flask import Flask, render_template, redirect, url_for, flash
+from datetime import datetime, timedelta
+import plotly.graph_objs as go
+from plotly.utils import PlotlyJSONEncoder
+import json
+from pymongo import MongoClient
+import logging
+
+
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger()
@@ -96,6 +104,51 @@ def login():
             flash("Usuario o contraseña incorrectos.")
             return redirect(url_for("login"))
     return render_template("login.html")
+
+@app.route("/registro", methods=["GET", "POST"])
+def registro():
+    if request.method == "POST":
+        try:
+            # Extract form data
+            client_name = request.form.get("client_name")
+            phone = request.form.get("phone")
+            email = request.form.get("email")
+            password = request.form.get("password")
+            confirm_password = request.form.get("confirm_password")
+
+            # Validate passwords
+            if password != confirm_password:
+                flash("Las contraseñas no coinciden.")
+                return redirect(url_for("registro"))
+
+            # Encrypt password
+            encrypted_password = password_manager.encrypt_password(password)
+
+            # Create user data with fixed access type "cliente"
+            user_data = {
+                "client_name": client_name,
+                "phone": phone,
+                "email": email,
+                "access": "cliente",
+                "contraseña": encrypted_password,
+            }
+
+            # Generate client_id as MD5 hash of user data
+            user_json_string = f"{client_name}{phone}{email}cliente".encode("utf-8")
+            client_id = hashlib.md5(user_json_string).hexdigest()
+            user_data["client_id"] = client_id
+
+            # Insert into MongoDB
+            usuarios_collection.insert_one(user_data)
+            flash("Registro exitoso. Ahora puedes iniciar sesión.")
+            return redirect(url_for("login"))
+        except Exception as e:
+            flash("Error al registrar usuario.")
+            logger.error(f"Error al registrar usuario: {e}")
+            return redirect(url_for("registro"))
+
+    return render_template("registro.html")
+
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## CLient PLATFORM
@@ -269,9 +322,6 @@ def delete_from_cart():
         flash("Ocurrió un error al eliminar el producto.")
 
     return redirect(url_for("clientecarrito"))
-
-
-from bson import ObjectId  # Importar para manejar ObjectId en MongoDB
 
 @app.route("/finalizar-compra", methods=["POST"])
 def finalizar_compra():
@@ -455,19 +505,19 @@ def generate_page_one(ws, pedido):
         ws.column_dimensions[get_column_letter(col_num)].width = max_length + 2
 
 def generate_page_two(wb, pedido, catalogo_collection):
-    """Genera la segunda página con información detallada de Corte Láser."""
+    """Generates the second page with detailed Corte Láser information."""
     bold_font = Font(bold=True, size=14, color="FFFFFF")
     header_fill = PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid")
     center_alignment = Alignment(horizontal="center", vertical="center")
 
-    # Crear hoja 'Corte Láser'
+    # Create 'Corte Láser' sheet
     ws_laser = wb.create_sheet(title="Corte Láser")
 
-    # Normalizar claves (unificar nombres de atributos similares)
+    # Normalize keys (standardize similar attribute names)
     def normalize_key(key):
         return key.strip().lower().replace(" ", "_")
 
-    # Recopilar todos los atributos posibles de los cortes láser y atributos del formulario
+    # Collect all possible attributes from Corte Láser and form attributes
     all_attributes = set()
     for item in pedido["pedidos"]:
         modelo = item.get("modelo", "-")
@@ -477,14 +527,17 @@ def generate_page_two(wb, pedido, catalogo_collection):
         if isinstance(item.get("atributos"), dict):
             all_attributes.update(normalize_key(k) for k, v in item["atributos"].items() if k.lower() != "color")
 
-    # Excluir columnas específicas
-    excluded_columns = {"modelo", "color"}
-    all_attributes = [attr for attr in sorted(all_attributes) if attr not in excluded_columns]
+    # Ensure `modelo` is included and add it first
+    all_attributes = ["modelo"] + [attr for attr in sorted(all_attributes) if attr != "modelo"]
 
-    # Asegurar que solo se incluya "tipo-urna"
+    # Exclude specific columns
+    excluded_columns = {"color"}
+    all_attributes = [attr for attr in all_attributes if attr not in excluded_columns]
+
+    # Ensure "tipo-urna" is always included last
     all_attributes = [attr for attr in all_attributes if attr != "tipo_urna"] + ["tipo-urna"]
 
-    # Crear encabezados dinámicos
+    # Create dynamic headers
     headers_laser = ["Cantidad"] + all_attributes
     for col, header in enumerate(headers_laser, start=1):
         cell = ws_laser.cell(row=1, column=col)
@@ -493,38 +546,41 @@ def generate_page_two(wb, pedido, catalogo_collection):
         cell.fill = header_fill
         cell.alignment = center_alignment
 
-    # Agregar filas con los datos
+    # Add rows with data
     row_num = 2
     for item in pedido["pedidos"]:
         cantidad = item.get("cantidad", 0)
 
-        # Buscar en el catálogo usando Tipo de Modelo
+        # Look up in catalog using `Tipo de Modelo`
         modelo = item.get("modelo", "-")
         catalogo_item = catalogo_collection.find_one({"Tipo de Modelo": modelo})
         corte_lazer = {normalize_key(k): v for k, v in catalogo_item.get("corte_lazer", {}).items()} if catalogo_item else {}
         atributos_form = {normalize_key(k): v for k, v in item.get("atributos", {}).items() if k.lower() != "color"}
 
-        # Construir la fila con los datos
-        data_row = [cantidad]  # Inicia con la cantidad
+        # Build the row data
+        data_row = [cantidad]  # Start with quantity
         for attr in all_attributes:
-            value = atributos_form.get(attr, corte_lazer.get(attr, "-"))
+            if attr == "modelo":
+                value = modelo  # Ensure `modelo` is included
+            else:
+                value = atributos_form.get(attr, corte_lazer.get(attr, "-"))
             data_row.append(value)
 
-        # Escribir la fila en la hoja
+        # Write the row to the sheet
         for col, value in enumerate(data_row, start=1):
             cell = ws_laser.cell(row=row_num, column=col)
             cell.value = value
 
         row_num += 1
 
-    # Eliminar columnas con valores nulos
+    # Remove columns with all null values
     for col in range(len(headers_laser), 0, -1):
         if all(
             ws_laser.cell(row=row, column=col).value in [None, "-", ""] for row in range(2, row_num)
         ):
             ws_laser.delete_cols(col)
 
-    # Combinar filas duplicadas (excepto la columna "Cantidad")
+    # Merge duplicate rows (except the "Cantidad" column)
     row_data = []
     for row in ws_laser.iter_rows(min_row=2, max_row=row_num - 1, min_col=1, max_col=len(headers_laser)):
         row_values = [cell.value for cell in row]
@@ -532,14 +588,14 @@ def generate_page_two(wb, pedido, catalogo_collection):
 
     unique_rows = {}
     for row in row_data:
-        key = tuple(row[1:])  # Excluir la cantidad para crear la clave
+        key = tuple(row[1:])  # Exclude "Cantidad" to create the key
         cantidad = int(row[0]) if isinstance(row[0], int) else 0
         if key in unique_rows:
             unique_rows[key] += cantidad
         else:
             unique_rows[key] = cantidad
 
-    # Escribir filas únicas de vuelta
+    # Write unique rows back
     ws_laser.delete_rows(2, ws_laser.max_row)
     row_num = 2
     for key, cantidad in unique_rows.items():
@@ -549,12 +605,12 @@ def generate_page_two(wb, pedido, catalogo_collection):
             cell.value = value
         row_num += 1
 
-    # Ajustar ancho de columnas automáticamente
+    # Auto-adjust column widths
     for col_num, column_cells in enumerate(ws_laser.iter_cols(min_row=1, max_row=row_num - 1, min_col=1, max_col=len(headers_laser)), start=1):
         max_length = max((len(str(cell.value)) for cell in column_cells if cell.value), default=10)
         ws_laser.column_dimensions[get_column_letter(col_num)].width = max_length + 2
 
-    # Eliminar encabezados duplicados
+    # Eliminate duplicate headers
     seen_headers = set()
     duplicate_columns = []
     for col in range(1, len(headers_laser) + 1):
@@ -564,22 +620,22 @@ def generate_page_two(wb, pedido, catalogo_collection):
         else:
             seen_headers.add(header_value)
 
-    # Eliminar columnas duplicadas
+    # Delete duplicate columns
     for col in reversed(duplicate_columns):
         ws_laser.delete_cols(col)
-    
-    # Diccionario de mapeo para cambiar nombres de columnas
+
+    # Map column names to new names if necessary
     column_mapping = {
         "¿quieres_el_logo_de_tu_empresa?": "logo_grabado",
         "tipo-urna": "tipo-madera"
     }
 
-    # Cambiar los nombres de las columnas basados en el mapeo
     for col in range(1, ws_laser.max_column + 1):
         cell_value = ws_laser.cell(row=1, column=col).value
         if cell_value in column_mapping:
             ws_laser.cell(row=1, column=col).value = column_mapping[cell_value]
-    # Ajustar ancho de columnas automáticamente y permitir salto de línea
+
+    # Auto-adjust column widths and enable text wrapping
     for col_num, column_cells in enumerate(
         ws_laser.iter_cols(min_row=1, max_row=row_num - 1, min_col=1, max_col=ws_laser.max_column), start=1
     ):
@@ -587,15 +643,15 @@ def generate_page_two(wb, pedido, catalogo_collection):
         column_letter = get_column_letter(col_num)
         ws_laser.column_dimensions[column_letter].width = max_length + 2
 
-        # Estilo para cada celda de la columna
         for cell in column_cells:
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    # Ajustar el alto de las filas automáticamente
+    # Adjust row heights for better readability
     for row in ws_laser.iter_rows(min_row=1, max_row=row_num - 1, min_col=1, max_col=ws_laser.max_column):
         for cell in row:
             if cell.value:
-                ws_laser.row_dimensions[cell.row].height = 15  # Ajusta la altura según sea necesario
+                ws_laser.row_dimensions[cell.row].height = 15
+                
 @app.route("/export_pedido/<orden_id>", methods=["GET"])
 def export_pedido(orden_id):
     try:
@@ -638,41 +694,80 @@ def export_pedido(orden_id):
         return redirect(url_for("adminplatform"))
 
 
+@app.route("/update_status/<orden_id>", methods=["POST"])
+def update_status(orden_id):
+    """Actualizar el estado de un pedido."""
+    try:
+        new_status = request.form["new_status"]
+        pedidos_collection = db["pedidos"]
+        pedidos_collection.update_one(
+            {"orden-id": orden_id},
+            {"$set": {"Estado": new_status}}
+        )
+        flash(f"Estado del pedido {orden_id} actualizado a {new_status}.")
+    except Exception as e:
+        logger.error(f"Error al actualizar el estado del pedido {orden_id}: {e}")
+        flash("Ocurrió un error al actualizar el estado del pedido.")
+    return redirect(url_for("adminplatform"))
+
 @app.route("/test_pedidos", methods=["GET"])
 def test_pedidos():
+    """Ruta para probar los datos de pedidos en JSON."""
     pedidos_collection = db["pedidos"]
     pedidos = list(pedidos_collection.find({}))
-    return jsonify(pedidos)  # Devuelve los datos en formato JSON para verificar
+    return jsonify(pedidos)
 
 @app.route("/adminplatform", methods=["GET"])
 def adminplatform():
     try:
-        # Acceder a la colección de pedidos
         pedidos_collection = db["pedidos"]
-        pedidos = list(pedidos_collection.find({}))  # Obtener todos los pedidos
+        pedidos = list(pedidos_collection.find({}))
 
-        # Preparar datos para mostrar una sola fila por Orden ID
-        pedidos_resumidos = []
+        # Dividir pedidos por estado
+        pedidos_en_proceso = []
+        pedidos_terminados = []
+
         for pedido in pedidos:
-            total_cantidad = sum(item["cantidad"] for item in pedido["pedidos"])  # Sumar todas las cantidades
-            total_pedidos = len(pedido["pedidos"])  # Contar el total de pedidos en la orden
-            pedidos_resumidos.append({
+            total_cantidad = sum(item["cantidad"] for item in pedido["pedidos"])
+            total_pedidos = len(pedido["pedidos"])
+            pedido_data = {
                 "Orden ID": pedido.get("orden-id", "-"),
                 "Cliente Nombre": pedido.get("cliente-nombre", "-"),
                 "Fecha": pedido.get("time-stamp", "-"),
                 "Cantidad Total": total_cantidad,
                 "Total Pedidos": total_pedidos,
                 "Estado": pedido.get("Estado", "-")
-            })
+            }
+            if pedido_data["Estado"] == "En proceso":
+                pedidos_en_proceso.append(pedido_data)
+            elif pedido_data["Estado"] == "Terminado":
+                pedidos_terminados.append(pedido_data)
 
-        # Renderizar la tabla con pedidos resumidos
-        return render_template("admin/adminplatform.html", pedidos=pedidos_resumidos)
+        # Ordenar por fecha de mayor a menor
+        pedidos_en_proceso.sort(key=lambda x: datetime.strptime(x["Fecha"], "%Y-%m-%d %H:%M:%S"), reverse=True)
+        pedidos_terminados.sort(key=lambda x: datetime.strptime(x["Fecha"], "%Y-%m-%d %H:%M:%S"), reverse=True)
+
+        # Limitar a los últimos 5 pedidos terminados
+        pedidos_terminados_mostrados = pedidos_terminados[:5]
+
+        # Totales
+        total_en_proceso = len(pedidos_en_proceso)
+        total_terminados = len(pedidos_terminados)
+
+        return render_template(
+            "admin/adminplatform.html",
+            pedidos_en_proceso=pedidos_en_proceso,
+            pedidos_terminados=pedidos_terminados_mostrados,
+            total_en_proceso=total_en_proceso,
+            total_terminados=total_terminados
+        )
 
     except Exception as e:
         logger.error(f"Error en adminplatform: {e}")
         flash("Ocurrió un error al cargar los pedidos.")
         return redirect(url_for("login"))
 
+    
 @app.route("/adminusuarios")
 def adminusuarios():
     try:
@@ -940,6 +1035,162 @@ def edit_corte_lazer(model_uuid):
     except Exception as e:
         logger.error(f"Error al guardar corte_lazer para {model_uuid}: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
+
+def get_pedidos_por_dia():
+    """
+    Genera un gráfico de pedidos por día en el último mes.
+    """
+    try:
+        pedidos_collection = db["pedidos"]
+
+        # Calcular rango de fechas
+        hoy = datetime.now()
+        hace_un_mes = hoy - timedelta(days=30)
+
+        # Filtrar pedidos en el último mes
+        pedidos = list(pedidos_collection.find({
+            "time-stamp": {"$gte": hace_un_mes.strftime("%Y-%m-%d %H:%M:%S")}
+        }, {"time-stamp": 1}))
+
+        # Contar pedidos por día
+        pedidos_por_dia = {}
+        for pedido in pedidos:
+            time_stamp = pedido.get("time-stamp", "")
+            if time_stamp:
+                fecha = time_stamp.split(" ")[0]
+                pedidos_por_dia[fecha] = pedidos_por_dia.get(fecha, 0) + 1
+
+        # Ordenar fechas y cantidades
+        fechas = sorted(pedidos_por_dia.keys())
+        cantidades = [pedidos_por_dia[fecha] for fecha in fechas]
+
+        # Crear gráfico con Plotly
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=fechas,
+            y=cantidades,
+            marker=dict(color='#1f77b4'),
+            text=cantidades,
+            textposition='auto'
+        ))
+        fig.update_layout(
+            title="Pedidos por Día (Último Mes)",
+            xaxis_title="Fecha",
+            yaxis_title="Cantidad de Pedidos",
+            xaxis=dict(tickangle=-45),
+            template="plotly_white"
+        )
+
+        return json.dumps(fig, cls=PlotlyJSONEncoder)
+    except Exception as e:
+        logger.error(f"Error al generar gráfico de pedidos por día: {e}")
+        return None
+
+def get_top_clientes_frecuentes():
+    """
+    Genera un gráfico de los top 3 clientes frecuentes.
+    """
+    try:
+        pedidos_collection = db["pedidos"]
+
+        # Contar la cantidad de pedidos por cliente
+        clientes = {}
+        pedidos = pedidos_collection.find({}, {"cliente-nombre": 1})
+        for pedido in pedidos:
+            cliente_nombre = pedido.get("cliente-nombre", "Desconocido")
+            clientes[cliente_nombre] = clientes.get(cliente_nombre, 0) + 1
+
+        # Ordenar clientes por número de pedidos y tomar los top 3
+        top_clientes = sorted(clientes.items(), key=lambda x: x[1], reverse=True)[:3]
+        nombres = [cliente[0] for cliente in top_clientes]
+        cantidades = [cliente[1] for cliente in top_clientes]
+
+        # Crear gráfico con Plotly
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=nombres,
+            y=cantidades,
+            marker=dict(color='#ff7f0e'),
+            text=cantidades,
+            textposition='auto'
+        ))
+        fig.update_layout(
+            title="Top 3 Clientes Frecuentes",
+            xaxis_title="Cliente",
+            yaxis_title="Cantidad de Pedidos",
+            template="plotly_white"
+        )
+
+        return json.dumps(fig, cls=PlotlyJSONEncoder)
+    except Exception as e:
+        logger.error(f"Error al generar gráfico de top clientes frecuentes: {e}")
+        return None
+
+def get_top_modelos_mas_pedidos():
+    """
+    Genera un gráfico de los top 3 modelos más pedidos.
+    """
+    try:
+        pedidos_collection = db["pedidos"]
+
+        # Contar la cantidad total de pedidos por modelo
+        modelos = {}
+        pedidos = pedidos_collection.find({}, {"pedidos": 1})
+        for pedido in pedidos:
+            for item in pedido.get("pedidos", []):
+                modelo = item.get("modelo", "Desconocido")
+                cantidad = item.get("cantidad", 0)
+                modelos[modelo] = modelos.get(modelo, 0) + cantidad
+
+        # Ordenar modelos por cantidad de pedidos y tomar los top 3
+        top_modelos = sorted(modelos.items(), key=lambda x: x[1], reverse=True)[:3]
+        nombres = [modelo[0] for modelo in top_modelos]
+        cantidades = [modelo[1] for modelo in top_modelos]
+
+        # Crear gráfico con Plotly
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=nombres,
+            y=cantidades,
+            marker=dict(color='#2ca02c'),
+            text=cantidades,
+            textposition='auto'
+        ))
+        fig.update_layout(
+            title="Top 3 Modelos Más Pedidos",
+            xaxis_title="Modelo",
+            yaxis_title="Cantidad de Pedidos",
+            template="plotly_white"
+        )
+
+        return json.dumps(fig, cls=PlotlyJSONEncoder)
+    except Exception as e:
+        logger.error(f"Error al generar gráfico de top modelos más pedidos: {e}")
+        return None
+    
+@app.route("/admindashboard", methods=["GET"])
+def admindashboard():
+    """
+    Renderiza el dashboard de administrador con gráficos.
+    """
+    try:
+        graph_pedidos_por_dia = get_pedidos_por_dia()
+        graph_top_clientes = get_top_clientes_frecuentes()
+        graph_top_modelos = get_top_modelos_mas_pedidos()
+
+        if not graph_pedidos_por_dia or not graph_top_clientes or not graph_top_modelos:
+            flash("Ocurrió un error al generar los gráficos.")
+            return redirect(url_for("adminplatform"))
+
+        return render_template("admin/admindashboard.html", 
+                               graph_pedidos_por_dia=graph_pedidos_por_dia,
+                               graph_top_clientes=graph_top_clientes,
+                               graph_top_modelos=graph_top_modelos)
+    except Exception as e:
+        logger.error(f"Error al cargar el dashboard de administrador: {e}")
+        flash("Ocurrió un error al cargar el dashboard.")
+        return redirect(url_for("adminplatform"))
+
 
 
 if __name__ == "__main__":
