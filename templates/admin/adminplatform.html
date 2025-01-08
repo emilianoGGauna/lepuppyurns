@@ -108,11 +108,11 @@
             <thead>
                 <tr>
                     <th>Orden ID</th>
-                    <th>Cliente</th>
+                    <th>Cliente Nombre</th>
                     <th>Fecha</th>
                     <th>Cantidad Total</th>
-                    <th>Total de Pedidos</th>
-                    <th>Acción</th>
+                    <th>Total Pedidos</th>
+                    <th>Estado</th>
                 </tr>
             </thead>
             <tbody>
@@ -123,6 +123,7 @@
                     <td>{{ pedido["Fecha"] }}</td>
                     <td>{{ pedido["Cantidad Total"] }}</td>
                     <td>{{ pedido["Total Pedidos"] }}</td>
+                    <td>{{ pedido["Estado"] }}</td>        
                     <td>
                         <!-- Botón para descargar el Excel de la orden -->
                         <form method="GET" action="/export_pedido/{{ pedido['Orden ID'] }}">

@@ -18,7 +18,8 @@ import base64
 from jinja2 import TemplateNotFound
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
-
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Font, Alignment, PatternFill
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger()
@@ -164,16 +165,20 @@ def add_to_cart(model_uuid):
             flash("Modelo no encontrado.")
             return redirect(url_for("clientecatalogo"))
 
+        # Crear un identificador único para la combinación de opciones
+        forms_hash = hashlib.sha256(str(forms_data).encode()).hexdigest()
+
         # Crear/Actualizar el carrito en MongoDB
         carrito_collection = db["carrito"]
         carrito_collection.update_one(
-            {"client_id": client_id, "model_uuid": model_uuid},
+            {"client_id": client_id, "model_uuid": model_uuid, "forms_hash": forms_hash},
             {"$set": {
                 "model": model,
                 "client_id": client_id,
                 "model_uuid": model_uuid,
                 "cantidad": cantidad,
-                "forms_data": forms_data
+                "forms_data": forms_data,
+                "forms_hash": forms_hash  # Almacenar el hash en la BD
             }},
             upsert=True
         )
@@ -183,6 +188,7 @@ def add_to_cart(model_uuid):
         logger.error(f"Error al añadir al carrito: {e}")
         flash("Ocurrió un error al añadir al carrito.")
         return redirect(url_for("clientecatalogo"))
+
 
 @app.route("/clientecarrito")
 def clientecarrito():
@@ -218,11 +224,12 @@ def update_cart():
     try:
         client_id = session.get("user_id")
         model_uuid = request.form.get("model_uuid")
+        forms_hash = request.form.get("forms_hash")  # Recuperar el hash único
         new_quantity = int(request.form.get("cantidad"))
 
         carrito_collection = db["carrito"]
         carrito_collection.update_one(
-            {"client_id": client_id, "model_uuid": model_uuid},
+            {"client_id": client_id, "model_uuid": model_uuid, "forms_hash": forms_hash},
             {"$set": {"cantidad": new_quantity}}
         )
         flash("Cantidad actualizada exitosamente.")
@@ -372,89 +379,264 @@ def finalizar_compra():
 ## ADMIN PLATFORM
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
+def generate_page_one(ws, pedido):
+    """Genera la primera página del pedido con estilo mejorado."""
+    # Estilo para el encabezado
+    bold_font = Font(bold=True, size=14, color="FFFFFF")
+    header_fill = PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid")
+    center_alignment = Alignment(horizontal="center", vertical="center")
+
+    # Agregar encabezado general
+    ws.merge_cells("A1:F1")
+    ws["A1"] = "Resumen del Pedido"
+    ws["A1"].font = Font(bold=True, size=18)
+    ws["A1"].alignment = center_alignment
+    ws["A1"].fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+
+    # Calcular la cantidad total y el número de modelos
+    total_cantidad = sum(item["cantidad"] for item in pedido["pedidos"])
+    total_modelos = len(pedido["pedidos"])
+
+    # Información principal del pedido
+    info_pedido = [
+        ["Orden ID", pedido.get("orden-id", "-")],
+        ["Cliente Nombre", pedido.get("cliente-nombre", "-")],
+        ["Fecha", pedido.get("time-stamp", "-")],
+        ["Cantidad Total", total_cantidad],
+        ["Número de Modelos", total_modelos]
+    ]
+
+    row = 2  # Comenzar en la fila 2
+    for key, value in info_pedido:
+        ws[f"A{row}"] = key
+        ws[f"A{row}"].font = Font(bold=True)
+        ws[f"B{row}"] = value
+        row += 1
+
+    # Espaciado entre secciones
+    row += 1
+
+    # Crear conjunto único de todos los atributos dinámicos en los modelos
+    all_attributes = set()
+    for item in pedido["pedidos"]:
+        all_attributes.update(item.get("atributos", {}).keys())
+
+    # Encabezados para la tabla
+    headers = ["Modelo", "Cantidad"] + sorted(all_attributes)  # Ordenar atributos alfabéticamente
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.font = bold_font
+        cell.fill = header_fill
+        cell.alignment = center_alignment
+
+    # Agregar filas con datos de los modelos en el pedido
+    row += 1
+    for item in pedido["pedidos"]:
+        data_row = [
+            item.get("modelo", "-"),
+            item.get("cantidad", 0),
+        ]
+        # Agregar valores de atributos dinámicos en el orden de los encabezados
+        for attr in sorted(all_attributes):
+            data_row.append(item.get("atributos", {}).get(attr, "-"))
+        for col, value in enumerate(data_row, start=1):
+            cell = ws.cell(row=row, column=col)
+            cell.value = value
+        row += 1
+
+    # Ajustar ancho de columnas automáticamente
+    for col_num, column_cells in enumerate(ws.iter_cols(min_row=1, max_row=row, min_col=1, max_col=len(headers)), start=1):
+        max_length = max((len(str(cell.value)) for cell in column_cells if cell.value), default=10)
+        ws.column_dimensions[get_column_letter(col_num)].width = max_length + 2
+
+def generate_page_two(wb, pedido, catalogo_collection):
+    """Genera la segunda página con información detallada de Corte Láser."""
+    bold_font = Font(bold=True, size=14, color="FFFFFF")
+    header_fill = PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid")
+    center_alignment = Alignment(horizontal="center", vertical="center")
+
+    # Crear hoja 'Corte Láser'
+    ws_laser = wb.create_sheet(title="Corte Láser")
+
+    # Normalizar claves (unificar nombres de atributos similares)
+    def normalize_key(key):
+        return key.strip().lower().replace(" ", "_")
+
+    # Recopilar todos los atributos posibles de los cortes láser y atributos del formulario
+    all_attributes = set()
+    for item in pedido["pedidos"]:
+        modelo = item.get("modelo", "-")
+        catalogo_item = catalogo_collection.find_one({"Tipo de Modelo": modelo})
+        if catalogo_item and isinstance(catalogo_item.get("corte_lazer"), dict):
+            all_attributes.update(normalize_key(k) for k in catalogo_item["corte_lazer"].keys())
+        if isinstance(item.get("atributos"), dict):
+            all_attributes.update(normalize_key(k) for k, v in item["atributos"].items() if k.lower() != "color")
+
+    # Excluir columnas específicas
+    excluded_columns = {"modelo", "color"}
+    all_attributes = [attr for attr in sorted(all_attributes) if attr not in excluded_columns]
+
+    # Asegurar que solo se incluya "tipo-urna"
+    all_attributes = [attr for attr in all_attributes if attr != "tipo_urna"] + ["tipo-urna"]
+
+    # Crear encabezados dinámicos
+    headers_laser = ["Cantidad"] + all_attributes
+    for col, header in enumerate(headers_laser, start=1):
+        cell = ws_laser.cell(row=1, column=col)
+        cell.value = header
+        cell.font = bold_font
+        cell.fill = header_fill
+        cell.alignment = center_alignment
+
+    # Agregar filas con los datos
+    row_num = 2
+    for item in pedido["pedidos"]:
+        cantidad = item.get("cantidad", 0)
+
+        # Buscar en el catálogo usando Tipo de Modelo
+        modelo = item.get("modelo", "-")
+        catalogo_item = catalogo_collection.find_one({"Tipo de Modelo": modelo})
+        corte_lazer = {normalize_key(k): v for k, v in catalogo_item.get("corte_lazer", {}).items()} if catalogo_item else {}
+        atributos_form = {normalize_key(k): v for k, v in item.get("atributos", {}).items() if k.lower() != "color"}
+
+        # Construir la fila con los datos
+        data_row = [cantidad]  # Inicia con la cantidad
+        for attr in all_attributes:
+            value = atributos_form.get(attr, corte_lazer.get(attr, "-"))
+            data_row.append(value)
+
+        # Escribir la fila en la hoja
+        for col, value in enumerate(data_row, start=1):
+            cell = ws_laser.cell(row=row_num, column=col)
+            cell.value = value
+
+        row_num += 1
+
+    # Eliminar columnas con valores nulos
+    for col in range(len(headers_laser), 0, -1):
+        if all(
+            ws_laser.cell(row=row, column=col).value in [None, "-", ""] for row in range(2, row_num)
+        ):
+            ws_laser.delete_cols(col)
+
+    # Combinar filas duplicadas (excepto la columna "Cantidad")
+    row_data = []
+    for row in ws_laser.iter_rows(min_row=2, max_row=row_num - 1, min_col=1, max_col=len(headers_laser)):
+        row_values = [cell.value for cell in row]
+        row_data.append(row_values)
+
+    unique_rows = {}
+    for row in row_data:
+        key = tuple(row[1:])  # Excluir la cantidad para crear la clave
+        cantidad = int(row[0]) if isinstance(row[0], int) else 0
+        if key in unique_rows:
+            unique_rows[key] += cantidad
+        else:
+            unique_rows[key] = cantidad
+
+    # Escribir filas únicas de vuelta
+    ws_laser.delete_rows(2, ws_laser.max_row)
+    row_num = 2
+    for key, cantidad in unique_rows.items():
+        data_row = [cantidad] + list(key)
+        for col, value in enumerate(data_row, start=1):
+            cell = ws_laser.cell(row=row_num, column=col)
+            cell.value = value
+        row_num += 1
+
+    # Ajustar ancho de columnas automáticamente
+    for col_num, column_cells in enumerate(ws_laser.iter_cols(min_row=1, max_row=row_num - 1, min_col=1, max_col=len(headers_laser)), start=1):
+        max_length = max((len(str(cell.value)) for cell in column_cells if cell.value), default=10)
+        ws_laser.column_dimensions[get_column_letter(col_num)].width = max_length + 2
+
+    # Eliminar encabezados duplicados
+    seen_headers = set()
+    duplicate_columns = []
+    for col in range(1, len(headers_laser) + 1):
+        header_value = ws_laser.cell(row=1, column=col).value
+        if header_value in seen_headers:
+            duplicate_columns.append(col)
+        else:
+            seen_headers.add(header_value)
+
+    # Eliminar columnas duplicadas
+    for col in reversed(duplicate_columns):
+        ws_laser.delete_cols(col)
+    
+    # Diccionario de mapeo para cambiar nombres de columnas
+    column_mapping = {
+        "¿quieres_el_logo_de_tu_empresa?": "logo_grabado",
+        "tipo-urna": "tipo-madera"
+    }
+
+    # Cambiar los nombres de las columnas basados en el mapeo
+    for col in range(1, ws_laser.max_column + 1):
+        cell_value = ws_laser.cell(row=1, column=col).value
+        if cell_value in column_mapping:
+            ws_laser.cell(row=1, column=col).value = column_mapping[cell_value]
+    # Ajustar ancho de columnas automáticamente y permitir salto de línea
+    for col_num, column_cells in enumerate(
+        ws_laser.iter_cols(min_row=1, max_row=row_num - 1, min_col=1, max_col=ws_laser.max_column), start=1
+    ):
+        max_length = max((len(str(cell.value)) for cell in column_cells if cell.value), default=10)
+        column_letter = get_column_letter(col_num)
+        ws_laser.column_dimensions[column_letter].width = max_length + 2
+
+        # Estilo para cada celda de la columna
+        for cell in column_cells:
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Ajustar el alto de las filas automáticamente
+    for row in ws_laser.iter_rows(min_row=1, max_row=row_num - 1, min_col=1, max_col=ws_laser.max_column):
+        for cell in row:
+            if cell.value:
+                ws_laser.row_dimensions[cell.row].height = 15  # Ajusta la altura según sea necesario
 @app.route("/export_pedido/<orden_id>", methods=["GET"])
 def export_pedido(orden_id):
     try:
         pedidos_collection = db["pedidos"]
+        catalogo_collection = db["catalogo"]
         pedido = pedidos_collection.find_one({"orden-id": orden_id})
-        
+
         if not pedido:
             flash("Pedido no encontrado.")
             return redirect(url_for("adminplatform"))
-        
-        # Calcular la cantidad total y el número de modelos
-        total_cantidad = sum(item["cantidad"] for item in pedido["pedidos"])
-        total_modelos = len(pedido["pedidos"])
 
         # Crear un nuevo archivo Excel con openpyxl
         wb = Workbook()
         ws = wb.active
         ws.title = "Resumen del Pedido"
 
-        # Estilo para el encabezado
-        bold_font = Font(bold=True, size=14, color="FFFFFF")
-        header_fill = PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid")
-        center_alignment = Alignment(horizontal="center", vertical="center")
+        # Generar página 1
+        generate_page_one(ws, pedido)
 
-        # Agregar encabezado general
-        ws.merge_cells("A1:F1")
-        ws["A1"] = "Resumen del Pedido"
-        ws["A1"].font = Font(bold=True, size=18)
-        ws["A1"].alignment = center_alignment
-        ws["A1"].fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")  # Fondo amarillo
-
-        # Información principal del pedido
-        ws.append(["Orden ID", pedido.get("orden-id", "-")])
-        ws.append(["Cliente Nombre", pedido.get("cliente-nombre", "-")])
-        ws.append(["Fecha", pedido.get("time-stamp", "-")])
-        ws.append(["Cantidad Total", total_cantidad])
-        ws.append(["Número de Modelos", total_modelos])
-        ws.append([])  # Fila vacía para separar encabezado del contenido
-
-        # Crear conjunto único de todos los atributos dinámicos en los modelos
-        all_attributes = set()
-        for item in pedido["pedidos"]:
-            all_attributes.update(item.get("atributos", {}).keys())
-
-        # Encabezados para la tabla
-        headers = ["Modelo", "Cantidad"] + sorted(all_attributes)  # Aseguramos orden alfabético para atributos
-        for col, header in enumerate(headers, start=1):
-            cell = ws.cell(row=7, column=col)
-            cell.value = header
-            cell.font = bold_font
-            cell.fill = header_fill
-            cell.alignment = center_alignment
-
-        # Agregar filas con datos de los modelos en el pedido
-        for item in pedido["pedidos"]:
-            row = [
-                item.get("modelo", "-"),
-                item.get("cantidad", 0),
-            ]
-            # Agregar valores de atributos dinámicos en el orden de los encabezados
-            for attr in sorted(all_attributes):
-                row.append(item.get("atributos", {}).get(attr, "-"))  # Si no existe el atributo, ponemos "N/A"
-            ws.append(row)  # Solo añadir datos, no encabezados
-
-        # Ajustar ancho de columnas
-        column_widths = [20, 10] + [15 for _ in all_attributes]  # Ajustar según el contenido esperado
-        for i, width in enumerate(column_widths, start=1):
-            ws.column_dimensions[chr(64 + i)].width = width
+        # Generar página 2
+        generate_page_two(wb, pedido, catalogo_collection)
 
         # Guardar el archivo temporalmente
         with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
             wb.save(temp_file.name)
             temp_file_path = temp_file.name
 
-        return send_file(
+        # Descargar el archivo
+        response = send_file(
             temp_file_path,
             as_attachment=True,
             download_name=f"pedido_{orden_id}.xlsx"
         )
+        response.call_on_close(lambda: os.unlink(temp_file_path))  # Eliminar archivo al terminar
+        return response
+
     except Exception as e:
         logger.error(f"Error al exportar pedido {orden_id}: {e}")
         flash("Ocurrió un error al exportar el pedido.")
         return redirect(url_for("adminplatform"))
+
 
 @app.route("/test_pedidos", methods=["GET"])
 def test_pedidos():
@@ -475,11 +657,12 @@ def adminplatform():
             total_cantidad = sum(item["cantidad"] for item in pedido["pedidos"])  # Sumar todas las cantidades
             total_pedidos = len(pedido["pedidos"])  # Contar el total de pedidos en la orden
             pedidos_resumidos.append({
-                "Orden ID": pedido.get("orden-id", "N/A"),
-                "Cliente Nombre": pedido.get("cliente-nombre", "N/A"),
-                "Fecha": pedido.get("time-stamp", "N/A"),
+                "Orden ID": pedido.get("orden-id", "-"),
+                "Cliente Nombre": pedido.get("cliente-nombre", "-"),
+                "Fecha": pedido.get("time-stamp", "-"),
                 "Cantidad Total": total_cantidad,
-                "Total Pedidos": total_pedidos
+                "Total Pedidos": total_pedidos,
+                "Estado": pedido.get("Estado", "-")
             })
 
         # Renderizar la tabla con pedidos resumidos
