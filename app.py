@@ -423,6 +423,54 @@ def finalizar_compra():
         flash("Ocurrió un error al finalizar tu compra.")
         return redirect(url_for("clientecarrito"))
 
+@app.route("/clientepedidos", methods=["GET"])
+def clientepedidos():
+    if "user_id" not in session:
+        flash("Por favor, inicie sesión para ver sus pedidos.")
+        return redirect(url_for("login"))
+
+    try:
+        # Recuperar el ID del cliente desde la sesión
+        client_id = session.get("user_id")
+        
+        # Consultar los pedidos del cliente
+        pedidos_collection = db["pedidos"]
+        pedidos = list(pedidos_collection.find({"cliente-id": client_id}))
+
+        # Dividir los pedidos por estado
+        pedidos_en_proceso = [pedido for pedido in pedidos if pedido.get("Estado") == "En proceso"]
+        pedidos_terminados = [pedido for pedido in pedidos if pedido.get("Estado") == "Terminado"]
+
+        # Calcular totales para cada orden
+        def calcular_totales(orden, color):
+            total_urnas = sum(item.get("cantidad", 0) for item in orden.get("pedidos", []))
+            pedidos_por_orden = len(orden.get("pedidos", []))
+            return {
+                "orden_id": orden.get("orden-id"),
+                "time_stamp": orden.get("time-stamp"),
+                "estado": orden.get("Estado"),
+                "cliente_nombre": orden.get("cliente-nombre"),
+                "total_urnas": total_urnas,
+                "pedidos_por_orden": pedidos_por_orden,
+                "detalles": orden.get("pedidos", []),
+                "card_color": color
+            }
+
+        # Generar detalles de pedidos en proceso y terminados
+        detalles_en_proceso = [calcular_totales(orden, "green") for orden in pedidos_en_proceso]
+        detalles_terminados = [calcular_totales(orden, "red") for orden in pedidos_terminados]
+
+        return render_template(
+            "cliente/clientepedidos.html",
+            pedidos_en_proceso=detalles_en_proceso,
+            pedidos_terminados=detalles_terminados
+        )
+    except Exception as e:
+        logger.error(f"Error al cargar los pedidos del cliente: {e}")
+        flash("Ocurrió un error al cargar sus pedidos.")
+        return redirect(url_for("clientecatalogo"))
+
+
 
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
