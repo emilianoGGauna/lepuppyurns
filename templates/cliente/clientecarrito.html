@@ -111,9 +111,10 @@
                                     <div class="input-group">
                                         <input type="number" id="cantidad-{{ item['model_uuid'] }}" name="cantidad" class="form-control" value="{{ item.cantidad }}" min="1">
                                         <input type="hidden" name="model_uuid" value="{{ item['model_uuid'] }}">
+                                        <input type="hidden" name="forms_hash" value="{{ item['forms_hash'] }}">
                                         <button type="submit" class="btn btn-primary">Actualizar</button>
                                     </div>
-                                </form>
+                                </form>                                
                                 <p class="mt-3"><strong>Opciones seleccionadas:</strong></p>
                                 <ul>
                                     {% for key, value in item.forms_data.items() %}

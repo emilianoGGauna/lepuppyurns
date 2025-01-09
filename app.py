@@ -26,7 +26,7 @@ from plotly.utils import PlotlyJSONEncoder
 import json
 from pymongo import MongoClient
 import logging
-
+import re
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -275,22 +275,34 @@ def update_cart():
         return redirect(url_for("login"))
 
     try:
+        # Recuperar datos del formulario
         client_id = session.get("user_id")
         model_uuid = request.form.get("model_uuid")
-        forms_hash = request.form.get("forms_hash")  # Recuperar el hash único
+        forms_hash = request.form.get("forms_hash")  # Identificador único del carrito
         new_quantity = int(request.form.get("cantidad"))
 
+        # Validar que la cantidad sea positiva
+        if new_quantity < 1:
+            flash("La cantidad debe ser mayor a 0.")
+            return redirect(url_for("clientecarrito"))
+
         carrito_collection = db["carrito"]
-        carrito_collection.update_one(
+        result = carrito_collection.update_one(
             {"client_id": client_id, "model_uuid": model_uuid, "forms_hash": forms_hash},
             {"$set": {"cantidad": new_quantity}}
         )
-        flash("Cantidad actualizada exitosamente.")
+
+        if result.matched_count > 0:
+            flash("Cantidad actualizada exitosamente.")
+        else:
+            flash("No se encontró el producto en el carrito.")
+
     except Exception as e:
         logger.error(f"Error al actualizar el carrito: {e}")
         flash("Ocurrió un error al actualizar su carrito.")
 
     return redirect(url_for("clientecarrito"))
+
 
 @app.route("/delete_from_cart", methods=["POST"])
 def delete_from_cart():
@@ -578,12 +590,11 @@ def generate_page_two(wb, pedido, catalogo_collection):
     # Ensure `modelo` is included and add it first
     all_attributes = ["modelo"] + [attr for attr in sorted(all_attributes) if attr != "modelo"]
 
-    # Exclude specific columns
-    excluded_columns = {"color"}
-    all_attributes = [attr for attr in all_attributes if attr not in excluded_columns]
+    # Excluir columnas que contengan "color" en cualquier parte del nombre
+    excluded_columns = {attr for attr in all_attributes if re.search(r"color", attr, re.IGNORECASE)}
 
-    # Ensure "tipo-urna" is always included last
-    all_attributes = [attr for attr in all_attributes if attr != "tipo_urna"] + ["tipo-urna"]
+    # Excluir columnas específicas y asegurar que "tipo-urna" siempre esté al final
+    all_attributes = [attr for attr in all_attributes if attr not in excluded_columns and attr != "tipo_urna"] + ["tipo-urna"]
 
     # Create dynamic headers
     headers_laser = ["Cantidad"] + all_attributes
