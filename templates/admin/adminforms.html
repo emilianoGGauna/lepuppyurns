@@ -154,7 +154,7 @@
 </head>
 <body>
     <div class="navbar">
-        <h1>Admin Platform</h1>
+        <h1>Admin Forms</h1>
         <div class="hamburger" onclick="toggleMenu()">
             <div></div>
             <div></div>
@@ -213,6 +213,8 @@
             
                 <button type="button" onclick="openEditor('{{ model['model-uuid'] }}')">Editar Formulario</button>
                 <button type="button" onclick="openCorteLazerEditor('{{ model['model-uuid'] }}')">Editar Corte Láser</button>
+                <button type="button" onclick="openImageEditor('{{ model['model-uuid'] }}')">Cambiar Imagen Descriptiva</button>
+
             </form>            
         </div>
     </div>
@@ -237,6 +239,23 @@
         </div>
     </div>
 
+    <div id="changeImageModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeImageEditor()">&times;</span>
+            <h2>Cambiar Imagen Descriptiva</h2>
+            <form id="changeImageForm">
+                <input type="hidden" id="imageModelUuid" name="modelUuid">
+                <label for="newImage">Seleccionar nueva imagen:</label>
+                <input type="file" id="newImage" name="new_image" accept="image/*" required>
+                <div style="margin-top: 10px;">
+                    <button type="submit" style="background-color: #0078d7; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Guardar</button>
+                    <button type="button" style="background-color: #e74c3c; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;" onclick="closeImageEditor()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    
     <script src="https://cdn.jsdelivr.net/npm/jsoneditor/dist/jsoneditor.min.js"></script>
     <script>
         let editor;
@@ -327,6 +346,40 @@
                 }
             });
         }
+
+        function openImageEditor(modelUuid) {
+            document.getElementById('imageModelUuid').value = modelUuid;
+            document.getElementById('changeImageModal').style.display = 'block';
+        }
+
+        function closeImageEditor() {
+            document.getElementById('changeImageModal').style.display = 'none';
+        }
+
+        document.getElementById('changeImageForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const modelUuid = document.getElementById('imageModelUuid').value;
+
+            fetch(`/change_description_image/${modelUuid}`, {
+                method: 'POST',
+                body: formData,
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        alert('Imagen actualizada con éxito.');
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al cambiar la imagen:', error);
+                    alert('Ocurrió un error al cambiar la imagen.');
+                });
+        });
+
     </script>
 </body>
 </html>

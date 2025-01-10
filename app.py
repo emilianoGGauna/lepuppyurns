@@ -186,7 +186,6 @@ def clientecatalogo():
         return redirect(url_for("login"))
 
 
-
 @app.route("/clienteforms/<model_uuid>", methods=["GET", "POST"])
 def clienteforms(model_uuid):
     if request.method == "GET":
@@ -990,6 +989,68 @@ def update_sort_order(model_uuid):
         return jsonify({"message": "Orden actualizado correctamente."}), 200
     except Exception as e:
         logger.error(f"Error al actualizar el sort_order: {e}")
+        return jsonify({"error": "Error interno del servidor."}), 500
+
+@app.route("/change_image/<model_uuid>", methods=["POST"])
+def change_image(model_uuid):
+    try:
+        # Validar si se envió un archivo
+        if 'new_image' not in request.files:
+            return jsonify({"error": "No se envió ninguna imagen."}), 400
+
+        new_image = request.files['new_image']
+
+        # Validar que el archivo sea una imagen
+        if not new_image or new_image.filename == '':
+            return jsonify({"error": "Archivo inválido."}), 400
+
+        # Convertir la imagen a Base64
+        new_image_base64 = base64.b64encode(new_image.read()).decode("utf-8")
+
+        # Actualizar la base de datos con la nueva imagen
+        result = catalogo_collection.update_one(
+            {"model-uuid": model_uuid},
+            {"$set": {"img.modelos": new_image_base64}}
+        )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Modelo no encontrado."}), 404
+
+        return jsonify({"message": "Imagen cambiada con éxito."}), 200
+
+    except Exception as e:
+        logger.error(f"Error al cambiar la imagen para {model_uuid}: {e}")
+        return jsonify({"error": "Error interno del servidor."}), 500
+
+@app.route("/change_description_image/<model_uuid>", methods=["POST"])
+def change_description_image(model_uuid):
+    try:
+        # Validar si se envió un archivo
+        if 'new_image' not in request.files:
+            return jsonify({"error": "No se envió ninguna imagen."}), 400
+
+        new_image = request.files['new_image']
+
+        # Validar que el archivo sea una imagen
+        if not new_image or new_image.filename == '':
+            return jsonify({"error": "Archivo inválido."}), 400
+
+        # Convertir la imagen a Base64
+        new_image_base64 = base64.b64encode(new_image.read()).decode("utf-8")
+
+        # Actualizar la base de datos con la nueva imagen descriptiva
+        result = catalogo_collection.update_one(
+            {"model-uuid": model_uuid},
+            {"$set": {"img.description_models": new_image_base64}}
+        )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Modelo no encontrado."}), 404
+
+        return jsonify({"message": "Imagen descriptiva cambiada con éxito."}), 200
+
+    except Exception as e:
+        logger.error(f"Error al cambiar la imagen descriptiva para {model_uuid}: {e}")
         return jsonify({"error": "Error interno del servidor."}), 500
 
 @app.route("/admincatalogo")

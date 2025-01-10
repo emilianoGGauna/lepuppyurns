@@ -87,6 +87,21 @@
             border-bottom: 1px solid #ddd;
             border-radius: 8px;
         }
+        /* Botones en una fila */
+        .button-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            gap: 10px; /* Espaciado entre los botones */
+        }
+
+        .button-column {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
         .delete-button {
             background-color: red;
             color: white;
@@ -95,13 +110,14 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
+            margin-top: 5px;
+            width: 100%;
         }
+
         .delete-button:hover {
             background-color: darkred;
         }
+
         .view-button {
             background-color: #333;
             color: white;
@@ -110,10 +126,18 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+            flex: 1; /* Permite que los botones tengan el mismo ancho */
         }
+
         .view-button:hover {
             background-color: #555;
         }
+
+        input[type="number"] {
+            width: 100%;
+            margin-top: 5px;
+        }
+
         /* Contenedor para agregar nuevos modelos */
         .add-catalog-container {
             max-width: 600px;
@@ -214,6 +238,17 @@
                 font-size: 14px;
             }
         }
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
     </style>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
@@ -269,27 +304,30 @@
 
     <div class="catalog-container">
         {% for item in catalogos %}
-            <div class="model-card">
-                <img src="data:image/png;base64,{{ item['img']['modelos'] }}" alt="{{ item['Tipo de Modelo'] }}">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
-                    <input type="number" 
-                           min="1" 
-                           style="width: 50px; margin-right: 10px;" 
-                           value="{{ item['sort_order'] }}" 
+        <div class="model-card">
+            <img src="data:image/png;base64,{{ item['img']['modelos'] }}" alt="{{ item['Tipo de Modelo'] }}">
+            <div class="button-column">
+                <!-- Segunda fila -->
+                <div class="button-row">
+                    <button class="view-button" onclick="redirectToForms('{{ item['model-uuid'] }}')">Ver Detalles</button>
+                    <button class="view-button" onclick="showChangeImageModal('{{ item['model-uuid'] }}')">Cambiar Imagen</button>
+                </div>
+                <!-- Primera fila -->
+                <div>
+                    <input type="number"
+                           min="1"
+                           value="{{ item['sort_order'] }}"
                            onchange="updateSortOrder('{{ item['model-uuid'] }}', this.value)" />
                     <button class="delete-button" onclick="deleteCatalogItem('{{ item['model-uuid'] }}')">
-                        <i class="fas fa-trash"></i> Eliminar
-                    </button>
-                    <button class="view-button" onclick="redirectToForms('{{ item['model-uuid'] }}')">
-                        Ver Detalles
+                        Eliminar
                     </button>
                 </div>
-                
             </div>
+        </div>
+        
         {% endfor %}
     </div>
-    
-    
+
     <div class="add-catalog-container">
         <h2>Agregar Nuevo Modelo</h2>
         <form action="/add_catalog_item" method="POST" enctype="multipart/form-data">
@@ -305,6 +343,23 @@
             <button type="submit">Agregar Modelo</button>
         </form>
     </div>
+
+    <!-- Modal para Cambiar Imagen -->
+    <div id="overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 999;"></div>
+
+    <div id="changeImageModal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); z-index: 1000;">
+        <h3>Cambiar Imagen</h3>
+        <form id="changeImageForm">
+            <input type="hidden" id="modelUuid" name="modelUuid">
+            <label for="newImage">Seleccionar nueva imagen:</label>
+            <input type="file" id="newImage" name="new_image" accept="image/*" required>
+            <div style="margin-top: 10px;">
+                <button type="submit" style="background-color: #0078d7; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Guardar</button>
+                <button type="button" style="background-color: #e74c3c; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;" onclick="closeChangeImageModal()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+
 
     <script>
         function toggleMenu() {
@@ -336,6 +391,43 @@
                 });
             }
         }
+        function showChangeImageModal(modelUuid) {
+            document.getElementById("modelUuid").value = modelUuid; // Asegúrate de que este elemento existe
+            document.getElementById("changeImageModal").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }
+
+        function closeChangeImageModal() {
+            document.getElementById("changeImageModal").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+        }
+
+        document.getElementById("changeImageForm").addEventListener("submit", function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const modelUuid = document.getElementById("modelUuid").value;
+
+            fetch(`/change_image/${modelUuid}`, {
+                method: "POST",
+                body: formData
+            })
+
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert("Error: " + data.error);
+                    } else {
+                        alert(data.message);
+                        location.reload(); // Recargar la página para reflejar la nueva imagen
+                    }
+                })
+                .catch(error => {
+                    console.error("Error al cambiar la imagen:", error);
+                    alert("Ocurrió un error al cambiar la imagen.");
+                });
+        });
+
+
     </script>
 </body>
 </html>
