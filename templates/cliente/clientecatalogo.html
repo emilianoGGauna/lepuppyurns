@@ -12,68 +12,95 @@
             padding: 0;
             background-color: #f4f4f4;
         }
+
         .navbar {
             background-color: #333;
             color: white;
-            padding: 10px 20px;
+            padding: 5px 20px; /* Más delgada */
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-size: 14px; /* Reduce el tamaño de las letras */
         }
+
         .navbar h1 {
             margin: 0;
-            font-size: 24px;
-            flex: 1;
-            text-align: left;
+            font-size: 20px; /* Reduce el tamaño del título */
             color: white;
+            font-weight: bold;
         }
-        .cart-icon {
-            flex: 1;
+
+        .nav-links {
+            display: flex;
+            gap: 15px; /* Reduce el espacio entre enlaces */
+        }
+
+        .nav-links a {
+            background-color: #444;
+            color: white;
+            font-weight: bold;
+            text-decoration: none;
+            padding: 5px 15px; /* Reduce el tamaño del padding */
+            border-radius: 50px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s, transform 0.2s;
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 5px;
+            font-size: 14px; /* Reduce el tamaño de las letras */
         }
-        .hamburger {
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            justify-content: center;
-            flex: 1;
-        }
-        .hamburger div {
-            width: 30px;
-            height: 4px;
-            background-color: white;
-            margin: 3px 0;
-        }
-        .menu {
-            display: none;
-            flex-direction: column;
-            background-color: #444;
-            position: absolute;
-            right: 20px;
-            top: 50px;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .menu a {
+
+        .nav-links a:hover {
+            background-color: #666;
+            transform: scale(1.05);
             color: white;
-            text-decoration: none;
-            padding: 10px 0;
-            text-align: center;
         }
-        .menu a:hover {
-            background-color: #555;
+
+        /* Contador del carrito */
+        #cart-count {
+            font-weight: bold;
+            color: white;
+            font-size: 14px; /* Reduce el tamaño */
         }
+
+        /* Icono del carrito */
+        .bi-cart {
+            font-size: 16px; /* Ajusta el tamaño del ícono */
+            color: white;
+        }
+
+        /* Estilo exclusivo del botón "Salir" */
+        .nav-links a:last-child {
+            background-color: #E74C3C;
+            color: white;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            font-size: 14px;
+        }
+
+        .nav-links a:last-child:hover {
+            background-color: #C0392B;
+            transform: scale(1.05);
+        }
+
         .catalog-container {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             padding: 20px;
-            margin: 0 auto;
-            max-width: 800px;
+            margin: 80px auto 0; /* Ajusta el margen superior para que empiece después de la barra de navegación */
+            max-width: 1200px; /* Ajusta según tus necesidades */
+            box-sizing: border-box;
         }
+
         .model-card {
             background-color: white;
             border: 1px solid #ddd;
@@ -83,14 +110,17 @@
             cursor: pointer;
             transition: transform 0.2s;
         }
+
         .model-card:hover {
             transform: scale(1.05);
         }
+
         .model-card img {
             max-width: 100%;
             border-bottom: 1px solid #ddd;
-            border-radius: 8px;
+            border-radius: 8px 8px 0 0;
         }
+
     </style>
     <script>
         function toggleMenu() {
@@ -101,28 +131,32 @@
         function redirectToForms(modelUuid) {
             window.location.href = `/clienteforms/${modelUuid}`;
         }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            fetch("/cart_count")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("cart-count").textContent = data.count;
+                })
+                .catch(err => {
+                    console.error("Error fetching cart count:", err);
+                });
+        });
     </script>
 </head>
 <body>
     <div class="navbar">
         <h1>Catálogo</h1>
-        <div class="cart-icon">
-            <a href="/clientecarrito" class="btn btn-outline-light">
-                <i class="bi bi-cart"></i> Carrito
-            </a>
-        </div>
-        <div class="hamburger" onclick="toggleMenu()">
-            <div></div>
-            <div></div>
-            <div></div>
-        </div>
-        <div class="menu">
+        <div class="nav-links">
             <a href="/clientecatalogo">Catálogo</a>
-            <a href="/clientecarrito">Carrito</a>
+            <a href="/clientecarrito" class="cart-link">
+                <i class="bi bi-cart"></i> Carrito (<span id="cart-count"></span>)
+            </a>
             <a href="/clientepedidos">Pedidos</a>
             <a href="/">Salir</a>
         </div>
     </div>
+    
 
     <div class="catalog-container">
         {% for item in catalogos %}

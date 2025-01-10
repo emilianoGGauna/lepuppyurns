@@ -47,7 +47,8 @@ app.secret_key = APP_KEY
 
 # Conexión a la base de datos MongoDB
 try:
-    client = MongoClient(MONGO_URI)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=30000)
+
     db = client["lepuppy"]
     usuarios_collection = db["usuarios"]
     catalogo_collection = db["catalogo"]
@@ -154,6 +155,19 @@ def registro():
 ## CLient PLATFORM
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+@app.route("/cart_count", methods=["GET"])
+def cart_count():
+    if "user_id" not in session:
+        return jsonify({"count": 0})  # Si no hay sesión, el carrito está vacío
+
+    try:
+        client_id = session.get("user_id")
+        carrito_collection = db["carrito"]
+        count = carrito_collection.count_documents({"client_id": client_id})  # Conteo de productos
+        return jsonify({"count": count})
+    except Exception as e:
+        logger.error(f"Error al obtener la cantidad de artículos en el carrito: {e}")
+        return jsonify({"count": 0})
 
 @app.route("/clientecatalogo")
 def clientecatalogo():
