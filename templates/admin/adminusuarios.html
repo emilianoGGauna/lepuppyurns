@@ -6,12 +6,16 @@
     <title>Usuarios</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* Global Styles */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
             background-color: #f8f9fa;
+            color: #333;
         }
+
+        /* Navbar Styles */
         .navbar {
             background-color: #343a40;
             color: white;
@@ -22,11 +26,14 @@
             position: sticky;
             top: 0;
             z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
         .navbar h1 {
             margin: 0;
             font-size: 24px;
         }
+
         .menu {
             display: none;
             flex-direction: column;
@@ -36,98 +43,156 @@
             top: 50px;
             padding: 10px;
             border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
         .menu a {
             color: white;
             text-decoration: none;
-            padding: 10px 0;
+            padding: 10px 20px;
+            border-radius: 5px;
             text-align: center;
         }
+
         .menu a.active {
             background-color: green;
             color: white;
-            border-radius: 5px;
         }
+
         .menu a:hover {
             background-color: #555;
         }
+
         .hamburger {
             cursor: pointer;
         }
+
         .hamburger div {
             width: 30px;
             height: 4px;
             background-color: white;
             margin: 5px 0;
         }
+
+        /* Form Styles */
         form {
-            width: 80%;
+            max-width: 600px;
             margin: 20px auto;
             padding: 20px;
-            border: 1px solid #ddd;
-            background-color: #f9f9f9;
-            border-radius: 5px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
+        form h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
         form input, form select, form button {
-            margin: 10px 0;
+            display: block;
             width: 100%;
-            padding: 10px;
+            padding: 12px 15px;
+            margin: 10px 0;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 5px;
             font-size: 16px;
+            box-sizing: border-box;
         }
-        table {
-            width: 80%;
+
+        form input:focus, form select:focus, form button:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        form button {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+
+        form button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Table Styles */
+        .table-container {
+            width: 90%;
             margin: 20px auto;
+            overflow-x: auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
             border-collapse: collapse;
         }
+
         th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
+            padding: 12px;
             text-align: center;
+            border: 1px solid #ddd;
         }
+
         th {
-            background-color: #333;
+            background-color: #007bff;
             color: white;
         }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
         td {
             vertical-align: middle;
         }
+
         .delete-btn {
             background-color: transparent;
             border: none;
             cursor: pointer;
-            width: 100%;
-            height: 100%;
         }
-        .delete-btn:hover {
-            opacity: 0.7;
-        }
+
         .delete-btn i {
             color: #ff4d4d;
-            font-size: 20px;
+            font-size: 18px;
         }
+
+        .delete-btn:hover i {
+            color: #d63031;
+        }
+
+        /* Responsive Styles */
         @media (max-width: 768px) {
+            form {
+                padding: 15px;
+            }
+
             table {
                 font-size: 14px;
-            }
-            .delete-btn i {
-                font-size: 18px;
             }
         }
     </style>
     <script>
+        // Toggle the navigation menu
         function toggleMenu() {
             const menu = document.querySelector(".menu");
             menu.style.display = menu.style.display === "flex" ? "none" : "flex";
         }
 
+        // Confirm user deletion
         function confirmDeleteUser(clientId) {
             if (confirm("¿Estás seguro de que deseas eliminar este usuario?")) {
                 const form = document.getElementById(`delete-form-${clientId}`);
                 form.submit();
             }
         }
+
+        // Highlight the active menu link
         document.addEventListener("DOMContentLoaded", () => {
             const activeTab = window.location.pathname;
             document.querySelectorAll(".menu a").forEach(link => {
@@ -157,6 +222,7 @@
 
     <!-- Add User Form -->
     <form action="/adduser" method="POST">
+        <h2>Añadir Usuario</h2>
         <input type="text" name="client_name" placeholder="Nombre del cliente" required>
         <input type="text" name="phone" placeholder="Teléfono" required>
         <input type="email" name="email" placeholder="Correo Electrónico" required>
@@ -171,32 +237,34 @@
     </form>
 
     <!-- User Table -->
-    <table>
-        <thead>
-            <tr>
-                <th>Email</th>
-                <th>Nombre</th>
-                <th>Acceso</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for usuario in usuarios %}
-            <tr>
-                <td>{{ usuario.email }}</td>
-                <td>{{ usuario.client_name }}</td>
-                <td>{{ usuario.access }}</td>
-                <td>
-                    <form id="delete-form-{{ usuario.client_id }}" action="/deleteuser" method="POST" style="margin: 0; padding: 0;">
-                        <input type="hidden" name="client_id" value="{{ usuario.client_id }}">
-                        <button type="button" class="delete-btn" onclick="confirmDeleteUser('{{ usuario.client_id }}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Nombre</th>
+                    <th>Acceso</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                <tr>
+                    <td>{{ usuario.email }}</td>
+                    <td>{{ usuario.client_name }}</td>
+                    <td>{{ usuario.access }}</td>
+                    <td>
+                        <form id="delete-form-{{ usuario.client_id }}" action="/deleteuser" method="POST">
+                            <input type="hidden" name="client_id" value="{{ usuario.client_id }}">
+                            <button type="button" class="delete-btn" onclick="confirmDeleteUser('{{ usuario.client_id }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </body>
 </html>

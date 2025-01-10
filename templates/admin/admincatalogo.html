@@ -114,42 +114,105 @@
         .view-button:hover {
             background-color: #555;
         }
+        /* Contenedor para agregar nuevos modelos */
         .add-catalog-container {
             max-width: 600px;
-            margin: 20px auto;
-            padding: 20px;
+            margin: 40px auto;
+            padding: 30px;
             background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            border: 1px solid #ddd;
         }
+
+        /* Título del formulario */
         .add-catalog-container h2 {
             text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
         }
+
+        /* Etiquetas del formulario */
         .add-catalog-container label {
             display: block;
-            margin: 10px 0 5px;
+            margin: 15px 0 8px;
             font-weight: bold;
+            color: #555;
+            font-size: 14px;
         }
-        .add-catalog-container input,
-        .add-catalog-container textarea {
+
+        /* Campos de entrada del formulario */
+        .add-catalog-container input[type="text"],
+        .add-catalog-container input[type="file"] {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 5px;
+            font-size: 16px;
+            background-color: #f9f9f9;
+            box-sizing: border-box;
         }
+
+        /* Campo enfocado */
+        .add-catalog-container input[type="text"]:focus,
+        .add-catalog-container input[type="file"]:focus {
+            border-color: #0078d7;
+            outline: none;
+            background-color: #fff;
+        }
+
+        /* Botón del formulario */
         .add-catalog-container button {
             display: block;
             width: 100%;
-            padding: 10px;
-            background-color: #333;
+            padding: 12px;
+            background-color: #0078d7;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
             cursor: pointer;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
+        /* Botón al pasar el cursor */
         .add-catalog-container button:hover {
-            background-color: #555;
+            background-color: #005bb5;
+        }
+
+        /* Botón activo */
+        .add-catalog-container button:active {
+            background-color: #004a94;
+            box-shadow: none;
+        }
+
+        /* Ajustes para pantallas pequeñas */
+        @media (max-width: 768px) {
+            .add-catalog-container {
+                padding: 20px;
+            }
+
+            .add-catalog-container h2 {
+                font-size: 20px;
+            }
+
+            .add-catalog-container label {
+                font-size: 13px;
+            }
+
+            .add-catalog-container input[type="text"],
+            .add-catalog-container input[type="file"] {
+                font-size: 14px;
+            }
+
+            .add-catalog-container button {
+                font-size: 14px;
+            }
         }
     </style>
     <script>
