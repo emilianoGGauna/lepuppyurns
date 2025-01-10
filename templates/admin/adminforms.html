@@ -178,7 +178,7 @@
             <h2>Formulario de {{ model['Tipo de Modelo'] }}</h2>
             <form method="POST" action="{{ url_for('add_to_cart', model_uuid=model['model-uuid']) }}">
                 {% for key, value in model['Forms'].items() %}
-                    {% if key == "Tipo Urna" and value %}
+                    {% if key == "Tipo Urna" and value is mapping %}
                         <div class="form-group">
                             <label for="tipo-urna"><strong>Tipo Urna</strong></label>
                             <select id="tipo-urna" name="tipo-urna" required onchange="updateColorOptions(this.value)">
@@ -210,10 +210,11 @@
                         </div>
                     {% endif %}
                 {% endfor %}
-
+            
                 <button type="button" onclick="openEditor('{{ model['model-uuid'] }}')">Editar Formulario</button>
                 <button type="button" onclick="openCorteLazerEditor('{{ model['model-uuid'] }}')">Editar Corte Láser</button>
             </form>
+            
         </div>
     </div>
 

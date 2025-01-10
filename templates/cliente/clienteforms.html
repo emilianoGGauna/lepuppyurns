@@ -243,27 +243,41 @@
                     <label for="cantidad"><strong>Cantidad</strong></label>
                     <input type="number" id="cantidad" name="cantidad" min="1" value="1" required>
                 </div>
+            
                 {% for key, value in model['Forms'].items() %}
-                    {% if key == "Tipo Urna" and value %}
-                        <!-- Tipo Urna -->
-                        <div class="form-group">
-                            <label for="tipo-urna"><strong>Tipo Urna</strong></label>
-                            <select id="tipo-urna" name="tipo-urna" required onchange="updateColorOptions(this.value)">
-                                <option value="">Seleccione una opción</option>
-                                {% for material_type in value.keys() %}
-                                    <option value="{{ material_type }}">{{ material_type }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-        
-                        <!-- Colores -->
-                        <div class="form-group">
-                            <label for="color"><strong>Colores</strong></label>
-                            <select id="color" name="color" required>
-                                <option value="">Seleccione un tipo de urna primero</option>
-                            </select>
-                        </div>
-                    {% elif key != "Tipo Urna" and key != "Mensaje" %}
+                    {% if key == "Tipo Urna" %}
+                        {% if value is mapping %}
+                            <!-- Tipo Urna como Diccionario -->
+                            <div class="form-group">
+                                <label for="tipo-urna"><strong>Tipo Urna</strong></label>
+                                <select id="tipo-urna" name="tipo-urna" required onchange="updateColorOptions(this.value)">
+                                    <option value="">Seleccione una opción</option>
+                                    {% for material_type in value.keys() %}
+                                        <option value="{{ material_type }}">{{ material_type }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+            
+                            <!-- Colores -->
+                            <div class="form-group">
+                                <label for="color"><strong>Colores</strong></label>
+                                <select id="color" name="color" required>
+                                    <option value="">Seleccione un tipo de urna primero</option>
+                                </select>
+                            </div>
+                        {% else %}
+                            <!-- Tipo Urna como Clave Normal -->
+                            <div class="form-group">
+                                <label for="tipo-urna"><strong>Tipo Urna</strong></label>
+                                <select id="tipo-urna" name="tipo-urna" required>
+                                    <option value="">Seleccione una opción</option>
+                                    {% for option in value %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        {% endif %}
+                    {% elif key != "Mensaje" %}
                         <!-- Render otros campos -->
                         {% if value is string %}
                             <div class="form-group">
@@ -283,6 +297,7 @@
                         {% endif %}
                     {% endif %}
                 {% endfor %}
+            
                 <button type="submit">Añadir al carrito</button>
             </form>
         
