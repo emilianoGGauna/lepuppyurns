@@ -18,6 +18,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
         .navbar h1 {
             margin: 0;
@@ -38,6 +41,11 @@
             text-decoration: none;
             padding: 10px 0;
             text-align: center;
+        }
+        .menu a.active {
+            background-color: green;
+            color: white;
+            border-radius: 5px;
         }
         .menu a:hover {
             background-color: #555;
@@ -65,6 +73,7 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            overflow-x: auto;
         }
         table th, table td {
             border: 1px solid #ddd;
@@ -86,23 +95,22 @@
         .btn-export:hover {
             background-color: #0056b3;
         }
-        .btn-status {
+        .status-label {
+            display: inline-block;
             padding: 5px 10px;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 14px;
+            border-radius: 5px;
+            font-weight: bold;
         }
-        .btn-status.en-proceso {
-            background-color: #28a745;
+        .status-label.en-proceso {
+            background-color: green;
             color: white;
         }
-        .btn-status.terminado {
-            background-color: #dc3545;
+        .status-label.terminado {
+            background-color: red;
             color: white;
         }
-        .btn-status:hover {
-            opacity: 0.9;
+        .scrollable {
+            overflow-x: auto;
         }
     </style>
     <script>
@@ -110,6 +118,33 @@
             const menu = document.querySelector(".menu");
             menu.style.display = menu.style.display === "flex" ? "none" : "flex";
         }
+
+        function updateStatus(orderId, newStatus) {
+            fetch(`/update_status/${orderId}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: `new_status=${newStatus}`,
+            })
+            .then((response) => {
+                if (response.ok) {
+                    location.reload(); // Recargar la página para reflejar los cambios
+                } else {
+                    alert("Error al actualizar el estado.");
+                }
+            })
+            .catch((error) => console.error("Error:", error));
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const activeTab = window.location.pathname;
+            document.querySelectorAll(".menu a").forEach(link => {
+                if (link.getAttribute("href") === activeTab) {
+                    link.classList.add("active");
+                }
+            });
+        });
     </script>
 </head>
 <body>
@@ -131,102 +166,77 @@
     <div class="container">
         <h2>Pedidos En Proceso</h2>
         <p>Total de pedidos en proceso: {{ total_en_proceso }}</p>
-        <table>
-            <thead>
-                <tr>
-                    <th>Orden ID</th>
-                    <th>Cliente</th>
-                    <th>Fecha</th>
-                    <th>Cantidad Total</th>
-                    <th>Total de Pedidos</th>
-                    <th>Estado</th>
-                    <th>Exportar</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for pedido in pedidos_en_proceso %}
-                <tr>
-                    <td>{{ pedido["Orden ID"] }}</td>
-                    <td>{{ pedido["Cliente Nombre"] }}</td>
-                    <td>{{ pedido["Fecha"] }}</td>
-                    <td>{{ pedido["Cantidad Total"] }}</td>
-                    <td>{{ pedido["Total Pedidos"] }}</td>
-                    <td>
-                        <span
-                            class="status-label en-proceso"
-                            onclick="updateStatus('{{ pedido['Orden ID'] }}', 'Terminado')"
-                            style="cursor: pointer; color: green; font-weight: bold;">
-                            En Proceso
-                        </span>
-                    </td>
-                    <td>
-                        <form method="GET" action="/export_pedido/{{ pedido['Orden ID'] }}">
-                            <button type="submit" class="btn-export">Descargar Excel</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    
+        <div class="scrollable">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Orden ID</th>
+                        <th>Cliente</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Exportar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos_en_proceso %}
+                    <tr>
+                        <td>{{ pedido["Orden ID"] }}</td>
+                        <td>{{ pedido["Cliente Nombre"] }}</td>
+                        <td>{{ pedido["Fecha"] }}</td>
+                        <td>
+                            <span
+                                class="status-label en-proceso"
+                                onclick="updateStatus('{{ pedido['Orden ID'] }}', 'Terminado')">
+                                En Proceso
+                            </span>
+                        </td>
+                        <td>
+                            <form method="GET" action="/export_pedido/{{ pedido['Orden ID'] }}">
+                                <button type="submit" class="btn-export">Descargar Excel</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
         <h2>Pedidos Terminados</h2>
         <p>Total de pedidos terminados: {{ total_terminados }}</p>
-        <table>
-            <thead>
-                <tr>
-                    <th>Orden ID</th>
-                    <th>Cliente</th>
-                    <th>Fecha</th>
-                    <th>Cantidad Total</th>
-                    <th>Total de Pedidos</th>
-                    <th>Estado</th>
-                    <th>Exportar</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for pedido in pedidos_terminados %}
-                <tr>
-                    <td>{{ pedido["Orden ID"] }}</td>
-                    <td>{{ pedido["Cliente Nombre"] }}</td>
-                    <td>{{ pedido["Fecha"] }}</td>
-                    <td>{{ pedido["Cantidad Total"] }}</td>
-                    <td>{{ pedido["Total Pedidos"] }}</td>
-                    <td>
-                        <span
-                            class="status-label terminado"
-                            onclick="updateStatus('{{ pedido['Orden ID'] }}', 'En proceso')"
-                            style="cursor: pointer; color: red; font-weight: bold;">
-                            Terminado
-                        </span>
-                    </td>
-                    <td>
-                        <form method="GET" action="/export_pedido/{{ pedido['Orden ID'] }}">
-                            <button type="submit" class="btn-export">Descargar Excel</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="scrollable">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Orden ID</th>
+                        <th>Cliente</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Exportar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos_terminados %}
+                    <tr>
+                        <td>{{ pedido["Orden ID"] }}</td>
+                        <td>{{ pedido["Cliente Nombre"] }}</td>
+                        <td>{{ pedido["Fecha"] }}</td>
+                        <td>
+                            <span
+                                class="status-label terminado"
+                                onclick="updateStatus('{{ pedido['Orden ID'] }}', 'En proceso')">
+                                Terminado
+                            </span>
+                        </td>
+                        <td>
+                            <form method="GET" action="/export_pedido/{{ pedido['Orden ID'] }}">
+                                <button type="submit" class="btn-export">Descargar Excel</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-    <script>
-        function updateStatus(orderId, newStatus) {
-            fetch(`/update_status/${orderId}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: `new_status=${newStatus}`,
-            })
-            .then((response) => {
-                if (response.ok) {
-                    location.reload(); // Recargar la página para reflejar los cambios
-                } else {
-                    alert("Error al actualizar el estado.");
-                }
-            })
-            .catch((error) => console.error("Error:", error));
-        }
-    </script>    
 </body>
 </html>

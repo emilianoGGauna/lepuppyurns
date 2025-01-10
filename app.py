@@ -807,8 +807,6 @@ def adminplatform():
                 "Orden ID": pedido.get("orden-id", "-"),
                 "Cliente Nombre": pedido.get("cliente-nombre", "-"),
                 "Fecha": pedido.get("time-stamp", "-"),
-                "Cantidad Total": total_cantidad,
-                "Total Pedidos": total_pedidos,
                 "Estado": pedido.get("Estado", "-")
             }
             if pedido_data["Estado"] == "En proceso":
@@ -1267,7 +1265,12 @@ def admindashboard():
 
 
 if __name__ == "__main__":
-    debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
+    debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"  # Detecta la variable de entorno
     port = int(os.environ.get("PORT", 5000))
-    logger.info(f"Iniciando servidor en el puerto {port}, modo debug: {debug_mode}")
+    
+    if debug_mode:
+        logger.info("El servidor está ejecutándose en modo DEBUG.")
+    else:
+        logger.info("El servidor está ejecutándose en modo PRODUCCIÓN.")
+    
     app.run(host="0.0.0.0", port=port, debug=debug_mode)
