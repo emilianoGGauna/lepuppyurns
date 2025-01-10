@@ -172,13 +172,19 @@ def cart_count():
 @app.route("/clientecatalogo")
 def clientecatalogo():
     try:
-        catalogos = list(catalogo_collection.find({}, {"_id": 0, "Tipo de Modelo": 1, "img": 1, "model-uuid": 1}))
+        # Consultar catálogo ordenado por sort_order
+        catalogos = list(
+            catalogo_collection.find(
+                {}, {"_id": 0, "Tipo de Modelo": 1, "img": 1, "model-uuid": 1, "sort_order": 1}
+            ).sort("sort_order", 1)
+        )
         logger.info(f"Catálogo cargado correctamente")
         return render_template("cliente/clientecatalogo.html", catalogos=catalogos)
     except Exception as e:
         flash(f"Error al cargar el catálogo.")
         logger.error(f"Error al cargar el catálogo: {e}")
         return redirect(url_for("login"))
+
 
 
 @app.route("/clienteforms/<model_uuid>", methods=["GET", "POST"])
@@ -945,17 +951,66 @@ def deleteuser():
         logger.error(f"Error al eliminar usuario: {e}")
         return redirect(url_for("adminusuarios"))
 
+@app.route("/update_sort_order/<model_uuid>", methods=["POST"])
+def update_sort_order(model_uuid):
+    try:
+        data = request.json
+        new_sort_order = data.get("sort_order")
+
+        if new_sort_order is None:
+            return jsonify({"error": "El número de orden es requerido."}), 400
+
+        # Obtener el modelo actual
+        current_item = catalogo_collection.find_one({"model-uuid": model_uuid})
+        if not current_item:
+            return jsonify({"error": "Modelo no encontrado."}), 404
+
+        # Ajustar el sort_order de los demás modelos
+        catalogo_collection.update_many(
+            {"sort_order": {"$gte": new_sort_order}}, 
+            {"$inc": {"sort_order": 1}}
+        )
+
+        # Actualizar el sort_order del modelo seleccionado
+        catalogo_collection.update_one(
+            {"model-uuid": model_uuid},
+            {"$set": {"sort_order": new_sort_order}}
+        )
+
+        # Reorganizar `sort_order` para eliminar huecos
+        items = list(
+            catalogo_collection.find({}, {"model-uuid": 1}).sort("sort_order", 1)
+        )
+        for idx, item in enumerate(items):
+            catalogo_collection.update_one(
+                {"model-uuid": item["model-uuid"]},
+                {"$set": {"sort_order": idx + 1}}
+            )
+
+        return jsonify({"message": "Orden actualizado correctamente."}), 200
+    except Exception as e:
+        logger.error(f"Error al actualizar el sort_order: {e}")
+        return jsonify({"error": "Error interno del servidor."}), 500
 
 @app.route("/admincatalogo")
 def admincatalogo():
     try:
-        catalogos = list(catalogo_collection.find({}, {"_id": 0, "Tipo de Modelo": 1, "img": 1, "model-uuid": 1}))
+        # Crear índice en sort_order si no existe (opcional)
+        catalogo_collection.create_index([("sort_order", 1)])
+
+        # Consultar y ordenar catálogo
+        catalogos = list(
+            catalogo_collection.find(
+                {}, {"_id": 0, "Tipo de Modelo": 1, "img": 1, "model-uuid": 1, "sort_order": 1}
+            ).sort("sort_order", 1).allow_disk_use(True)
+        )
         logger.info("Catálogo cargado correctamente.")
         return render_template("admin/admincatalogo.html", catalogos=catalogos)
     except Exception as e:
-        flash(f"Error al cargar el catálogo.")
+        flash("Error al cargar el catálogo.")
         logger.error(f"Error al cargar el catálogo: {e}")
         return redirect(url_for("login"))
+
 
 # Generar cadena aleatoria de 20 caracteres
 def generate_random_string(length=20):

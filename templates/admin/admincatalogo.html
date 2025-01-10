@@ -225,6 +225,30 @@
             });
         });
     </script>
+    <script>
+        function updateSortOrder(modelUuid, newSortOrder) {
+            fetch(`/update_sort_order/${modelUuid}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sort_order: parseInt(newSortOrder) })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert("Error: " + data.error);
+                } else {
+                    alert(data.message);
+                    location.reload(); // Recargar la página para reflejar el nuevo orden
+                }
+            })
+            .catch(error => {
+                console.error("Error al actualizar el orden:", error);
+                alert("Ocurrió un error al actualizar el orden.");
+            });
+        }
+
+    </script>
+
 </head>
 <body>
     <div class="navbar">
@@ -248,6 +272,11 @@
             <div class="model-card">
                 <img src="data:image/png;base64,{{ item['img']['modelos'] }}" alt="{{ item['Tipo de Modelo'] }}">
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
+                    <input type="number" 
+                           min="1" 
+                           style="width: 50px; margin-right: 10px;" 
+                           value="{{ item['sort_order'] }}" 
+                           onchange="updateSortOrder('{{ item['model-uuid'] }}', this.value)" />
                     <button class="delete-button" onclick="deleteCatalogItem('{{ item['model-uuid'] }}')">
                         <i class="fas fa-trash"></i> Eliminar
                     </button>
@@ -255,9 +284,11 @@
                         Ver Detalles
                     </button>
                 </div>
+                
             </div>
         {% endfor %}
     </div>
+    
     
     <div class="add-catalog-container">
         <h2>Agregar Nuevo Modelo</h2>
