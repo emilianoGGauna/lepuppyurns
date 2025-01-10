@@ -719,11 +719,29 @@ def generate_page_two(wb, pedido, catalogo_collection):
         for cell in column_cells:
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
+
     # Adjust row heights for better readability
     for row in ws_laser.iter_rows(min_row=1, max_row=row_num - 1, min_col=1, max_col=ws_laser.max_column):
         for cell in row:
             if cell.value:
                 ws_laser.row_dimensions[cell.row].height = 15
+
+    cantidad_header = ws_laser.cell(row=1, column=1).value
+    modelo_header = ws_laser.cell(row=1, column=2).value
+
+    # Asegurarnos de que los nombres se correspondan antes de cambiar
+    if cantidad_header.lower() == "cantidad" and modelo_header.lower() == "modelo":
+        ws_laser.cell(row=1, column=1).value = "Modelo"  # Cambiar "Cantidad" por "Modelo"
+        ws_laser.cell(row=1, column=2).value = "Cantidad"  # Cambiar "Modelo" por "Cantidad"
+
+    # Cambiar los valores de las dos primeras columnas en todas las filas
+    for row in ws_laser.iter_rows(min_row=2, max_row=row_num - 1, min_col=1, max_col=ws_laser.max_column):
+        first_value = row[0].value
+        second_value = row[1].value
+        # Intercambiar valores
+        row[0].value = second_value
+        row[1].value = first_value
+
                 
 @app.route("/export_pedido/<orden_id>", methods=["GET"])
 def export_pedido(orden_id):
