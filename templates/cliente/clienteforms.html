@@ -50,10 +50,10 @@
             border-radius: 50px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             transition: background-color 0.3s, transform 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 14px; /* Reduce el tamaño de las letras */
+            display: inline-flex; /* Alineación horizontal */
+            align-items: center; /* Centra texto y número verticalmente */
+            font-size: 14px;
+            gap: 5px; /* Espacio entre "Carrito" y el número */
         }
 
         .nav-links a:hover {
@@ -62,17 +62,17 @@
             color: white;
         }
 
-        /* Contador del carrito */
-        #cart-count {
-            font-weight: bold;
-            color: white;
-            font-size: 14px; /* Reduce el tamaño */
+        /* Específico para el carrito */
+        .cart-link {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
         }
 
-        /* Icono del carrito */
-        .bi-cart {
-            font-size: 16px; /* Ajusta el tamaño del ícono */
-            color: white;
+        .cart-link span {
+            font-size: 14px; /* Tamaño del número */
+            font-weight: bold;
+            color: #28a745; /* Verde para el número */
         }
 
         /* Estilo exclusivo del botón "Salir" */
@@ -223,7 +223,8 @@
         <div class="nav-links">
             <a href="/clientecatalogo">Catálogo</a>
             <a href="/clientecarrito" class="cart-link">
-                <i class="bi bi-cart"></i> Carrito (<span id="cart-count"></span>)
+                Carrito
+                <span id="cart-count"></span> <!-- Número al lado de "Carrito" -->
             </a>
             <a href="/clientepedidos">Pedidos</a>
             <a href="/">Salir</a>
