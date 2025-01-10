@@ -175,7 +175,7 @@
         </div>
 
         <div class="form-container">
-            <h2>Formulario de {{ model['Tipo de Modelo'] }}</h2>
+            <h2>{{ model['Tipo de Modelo'] }}</h2>
             <form method="POST" action="{{ url_for('add_to_cart', model_uuid=model['model-uuid']) }}">
                 {% for key, value in model['Forms'].items() %}
                     {% if key == "Tipo Urna" and value is mapping %}
@@ -213,8 +213,7 @@
             
                 <button type="button" onclick="openEditor('{{ model['model-uuid'] }}')">Editar Formulario</button>
                 <button type="button" onclick="openCorteLazerEditor('{{ model['model-uuid'] }}')">Editar Corte Láser</button>
-            </form>
-            
+            </form>            
         </div>
     </div>
 

@@ -237,7 +237,7 @@
         </div>
     
         <div class="form-container">
-            <h2>Formulario de {{ model['Tipo de Modelo'] }}</h2>
+            <h2>{{ model['Tipo de Modelo'] }}</h2>
             <form method="POST" action="{{ url_for('add_to_cart', model_uuid=model['model-uuid']) }}">
                 <div class="form-group">
                     <label for="cantidad"><strong>Cantidad</strong></label>
