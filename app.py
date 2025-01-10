@@ -445,7 +445,7 @@ def finalizar_compra():
                         f"- Atributos:\n{atributos}\n\n")
 
         mensaje_codificado = urllib.parse.quote(mensaje)
-        whatsapp_link = f"https://api.whatsapp.com/send?phone=3326374701&text={mensaje_codificado}"
+        whatsapp_link = f"https://api.whatsapp.com/send?phone=3325648862&text={mensaje_codificado}"
 
         return redirect(whatsapp_link)
 
