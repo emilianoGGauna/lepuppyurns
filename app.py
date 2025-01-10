@@ -606,6 +606,7 @@ def generate_page_two(wb, pedido, catalogo_collection):
 
     # Excluir columnas que contengan "color" en cualquier parte del nombre
     excluded_columns = {attr for attr in all_attributes if re.search(r"color", attr, re.IGNORECASE)}
+    excluded_columns = {attr for attr in all_attributes if re.search(r"Base", attr, re.IGNORECASE)}
 
     # Excluir columnas específicas y asegurar que "tipo-urna" siempre esté al final
     all_attributes = [attr for attr in all_attributes if attr not in excluded_columns and attr != "tipo_urna"] + ["tipo-urna"]
