@@ -75,19 +75,29 @@ def role_required(role):
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email")
+        identifier = request.form.get("email")  # Puede ser correo o teléfono
         password = request.form.get("password")
 
-        if not email or not password:
+        if not identifier or not password:
             flash("Por favor, complete todos los campos.")
             return redirect(url_for("login"))
 
         try:
             contraseña_encriptada_ingresada = password_manager.encrypt_password(password)
-            usuario = usuarios_collection.find_one({
-                "email": email,
-                "contraseña": contraseña_encriptada_ingresada
-            })
+
+            # Verificar si el identificador es un correo o un teléfono
+            if "@" in identifier:
+                # Es un correo
+                usuario = usuarios_collection.find_one({
+                    "email": identifier,
+                    "contraseña": contraseña_encriptada_ingresada
+                })
+            else:
+                # Es un número de teléfono
+                usuario = usuarios_collection.find_one({
+                    "telefono": identifier,
+                    "contraseña": contraseña_encriptada_ingresada
+                })
         except Exception as e:
             flash("Error al conectar con la base de datos.")
             logger.error(f"Error: {e}")
@@ -105,6 +115,49 @@ def login():
             flash("Usuario o contraseña incorrectos.")
             return redirect(url_for("login"))
     return render_template("login.html")
+    
+@app.route("/olvide-contraseña", methods=["GET", "POST"])
+def olvide_contraseña():
+    if request.method == "POST":
+        email = request.form.get("email")
+        phone = request.form.get("phone")
+        new_password = request.form.get("new_password")
+        confirm_password = request.form.get("confirm_password")
+
+        # Validar que las contraseñas coincidan
+        if new_password != confirm_password:
+            flash("Las contraseñas no coinciden.")
+            return redirect(url_for("olvide_contraseña"))
+
+        # Verificar si el usuario con el correo y teléfono existe
+        usuario = usuarios_collection.find_one({"email": email, "phone": phone})
+        if not usuario:
+            flash("No se encontró una cuenta con este correo electrónico y número de teléfono.")
+            return redirect(url_for("olvide_contraseña"))
+
+        # Encriptar la nueva contraseña usando PasswordManager
+        try:
+            hashed_password = password_manager.encrypt_password(new_password)
+        except Exception as e:
+            flash("Error al encriptar la nueva contraseña.")
+            logger.error(f"Error al encriptar la contraseña: {e}")
+            return redirect(url_for("olvide_contraseña"))
+
+        # Actualizar la contraseña en la base de datos
+        try:
+            usuarios_collection.update_one(
+                {"email": email, "phone": phone},
+                {"$set": {"contraseña": hashed_password}}
+            )
+            flash("Tu contraseña ha sido actualizada exitosamente.")
+            return redirect(url_for("login"))
+        except Exception as e:
+            flash("Error al actualizar la contraseña.")
+            logger.error(f"Error al actualizar la contraseña: {e}")
+            return redirect(url_for("olvide_contraseña"))
+
+    return render_template("olvide_contraseña.html")
+
 
 @app.route("/registro", methods=["GET", "POST"])
 def registro():
@@ -114,8 +167,14 @@ def registro():
             client_name = request.form.get("client_name")
             phone = request.form.get("phone")
             email = request.form.get("email")
+            confirm_email = request.form.get("confirm_email")  # Nuevo campo para confirmar correo
             password = request.form.get("password")
             confirm_password = request.form.get("confirm_password")
+
+            # Validate email and confirm email
+            if email != confirm_email:
+                flash("Los correos electrónicos no coinciden.")
+                return redirect(url_for("registro"))
 
             # Validate passwords
             if password != confirm_password:
@@ -149,6 +208,7 @@ def registro():
             return redirect(url_for("registro"))
 
     return render_template("registro.html")
+
 
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -222,9 +282,8 @@ def clienteforms(model_uuid):
 
 @app.route("/add_to_cart/<model_uuid>", methods=["POST"])
 def add_to_cart(model_uuid):
-    if "user_id" not in session:  # Cambia a verificar el ID del cliente
-        flash("Por favor, inicie sesión para añadir al carrito.")
-        return redirect(url_for("login"))
+    if "user_id" not in session:  # Verifica si el usuario está autenticado
+        return jsonify({"success": False, "error": "Por favor, inicie sesión para añadir al carrito."})
 
     try:
         # Obtener datos del formulario
@@ -234,8 +293,7 @@ def add_to_cart(model_uuid):
         forms_data = {key: value for key, value in request.form.items() if key != "cantidad"}
 
         if not model:
-            flash("Modelo no encontrado.")
-            return redirect(url_for("clientecatalogo"))
+            return jsonify({"success": False, "error": "Modelo no encontrado."})
 
         # Crear un identificador único para la combinación de opciones
         forms_hash = hashlib.sha256(str(forms_data).encode()).hexdigest()
@@ -254,12 +312,11 @@ def add_to_cart(model_uuid):
             }},
             upsert=True
         )
-        flash("Producto añadido al carrito.")
-        return redirect(url_for("clientecatalogo"))
+        return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error al añadir al carrito: {e}")
-        flash("Ocurrió un error al añadir al carrito.")
-        return redirect(url_for("clientecatalogo"))
+        return jsonify({"success": False, "error": "Ocurrió un error al añadir al carrito."})
+
 
 
 @app.route("/clientecarrito")
@@ -401,12 +458,16 @@ def finalizar_compra():
         orden_id = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
         pedidos = []
+        total_urnas = 0
         for item in orden:
             # Get the model name from the catalog
             model_uuid = item["model_uuid"]
             modelo = catalogo_collection.find_one({"model-uuid": model_uuid})
             nombre_modelo = modelo.get("Tipo de Modelo", "Modelo Desconocido") if modelo else "Modelo Desconocido"
-
+            
+            cantidad = item["cantidad"]
+            
+            total_urnas += cantidad
             pedidos.append({
                 "model_uuid": model_uuid,
                 "modelo": nombre_modelo,
@@ -435,14 +496,9 @@ def finalizar_compra():
             f"Hola, soy {client_name}.\n"
             f"Orden ID: {orden_id}\n"
             f"Fecha de compra: {time_stamp}\n"
-            f"He realizado {len(pedidos)} pedido(s):\n\n"
+            f"Cantidad de pedidos realizados: {len(pedidos)}\n"
+            f"Total de urnas: {total_urnas}\n"
         )
-        for i, pedido in enumerate(pedidos, start=1):
-            atributos = '\n'.join([f"{k}: {v}" for k, v in pedido['atributos'].items()])
-            mensaje += (f"Pedido {i}:\n"
-                        f"- Modelo: {pedido['modelo']}\n"
-                        f"- Cantidad: {pedido['cantidad']}\n"
-                        f"- Atributos:\n{atributos}\n\n")
 
         mensaje_codificado = urllib.parse.quote(mensaje)
         whatsapp_link = f"https://api.whatsapp.com/send?phone=3325648862&text={mensaje_codificado}"

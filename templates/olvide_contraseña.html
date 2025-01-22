@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro</title>
+    <title>Restablecer Contraseña</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -62,28 +62,17 @@
             border-color: #3498db;
             box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
         }
-        a {
-            color: #3498db;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
     </style>
 </head>
 <body>
     <div class="form-container">
-        <h1>Registro</h1>
-        <form method="POST" action="/registro">
-            <input type="text" name="client_name" placeholder="Nombre completo" required>
-            <input type="text" name="phone" placeholder="Teléfono" required 
-                   pattern="\d{10}" title="El teléfono debe contener exactamente 10 dígitos.">
+        <h1>Restablecer Contraseña</h1>
+        <form method="POST" action="/olvide-contraseña">
             <input type="email" name="email" placeholder="Correo electrónico" required>
-            <input type="email" name="confirm_email" placeholder="Confirmar correo electrónico" required>
-            <input type="password" name="password" placeholder="Contraseña" required>
+            <input type="text" name="phone" placeholder="Número de teléfono" required>
+            <input type="password" name="new_password" placeholder="Nueva contraseña" required>
             <input type="password" name="confirm_password" placeholder="Confirmar contraseña" required>
-            <button type="submit">Registrarme</button>
+            <button type="submit">Actualizar Contraseña</button>
         </form>
         <p>¿Ya tienes una cuenta? <a href="/">Iniciar Sesión</a></p>
     </div>

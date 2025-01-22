@@ -9,7 +9,7 @@
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
-            background-color: #333;
+            background-color: #2c3e50;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -93,6 +93,11 @@
             text-decoration: underline;
         }
 
+        .forgot-password {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
         /* Vista de pantallas grandes */
         @media (min-width: 768px) {
             body {
@@ -129,6 +134,9 @@
             <button type="submit">Iniciar Sesión</button>
         </form>
         <p>¿No tienes una cuenta? <a href="/registro">Registrarme</a></p>
+        <div class="forgot-password">
+            <a href="/olvide-contraseña">Olvidé mi contraseña</a>
+        </div>
     </div>
 </body>
 </html>
