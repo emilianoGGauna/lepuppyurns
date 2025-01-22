@@ -666,8 +666,8 @@ def generate_page_two(wb, pedido, catalogo_collection):
     all_attributes = ["modelo"] + [attr for attr in sorted(all_attributes) if attr != "modelo"]
 
     # Excluir columnas que contengan "color" en cualquier parte del nombre
-    excluded_columns = {attr for attr in all_attributes if re.search(r"color", attr, re.IGNORECASE)}
-    excluded_columns = {attr for attr in all_attributes if re.search(r"Base", attr, re.IGNORECASE)}
+    # Excluir columnas que contengan "color" o "base" en cualquier parte del nombre
+    excluded_columns = {attr for attr in all_attributes if re.search(r"(color|Base)", attr, re.IGNORECASE)}
 
     # Excluir columnas específicas y asegurar que "tipo-urna" siempre esté al final
     all_attributes = [attr for attr in all_attributes if attr not in excluded_columns and attr != "tipo_urna"] + ["tipo-urna"]
@@ -869,6 +869,26 @@ def test_pedidos():
     pedidos_collection = db["pedidos"]
     pedidos = list(pedidos_collection.find({}))
     return jsonify(pedidos)
+
+
+@app.route("/delete_pedido/<orden_id>", methods=["POST"])
+def delete_pedido(orden_id):
+    """
+    Elimina un pedido basado en su Orden ID.
+    """
+    try:
+        pedidos_collection = db["pedidos"]
+        result = pedidos_collection.delete_one({"orden-id": orden_id})
+
+        if result.deleted_count > 0:
+            flash(f"Pedido {orden_id} eliminado exitosamente.")
+        else:
+            flash(f"No se encontró el pedido con Orden ID {orden_id}.")
+    except Exception as e:
+        logger.error(f"Error al eliminar el pedido {orden_id}: {e}")
+        flash("Ocurrió un error al intentar eliminar el pedido.")
+    
+    return redirect(url_for("adminplatform"))
 
 @app.route("/adminplatform", methods=["GET"])
 def adminplatform():

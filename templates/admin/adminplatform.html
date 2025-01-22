@@ -175,6 +175,7 @@
                         <th>Fecha</th>
                         <th>Estado</th>
                         <th>Exportar</th>
+                        <th>Eliminar</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -195,12 +196,19 @@
                                 <button type="submit" class="btn-export">Descargar Excel</button>
                             </form>
                         </td>
+                        <td>
+                            <form method="POST" action="/delete_pedido/{{ pedido['Orden ID'] }}">
+                                <button type="submit" class="btn-delete" onclick="return confirm('¿Seguro que quieres eliminar este pedido?')">
+                                    Eliminar
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-
+        
         <h2>Pedidos Terminados</h2>
         <p>Total de pedidos terminados: {{ total_terminados }}</p>
         <div class="scrollable">
