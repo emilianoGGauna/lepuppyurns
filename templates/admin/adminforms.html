@@ -292,7 +292,7 @@
                 .then(data => {
                     const container = document.getElementById('jsoneditor');
                     if (!editor) {
-                        editor = new JSONEditor(container, { mode: 'tree', modes: ['tree', 'view', 'code'] });
+                        editor = new JSONEditor(container, { mode: 'tree', modes: ['tree', 'view', 'code'], preserveOrder: true});
                     }
                     editor.set(data);
                 });
